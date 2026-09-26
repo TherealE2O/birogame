@@ -18,6 +18,9 @@
     --shadow:        0 12px 40px rgba(0,0,0,0.7);
 }
 
+/* Global utility – used by JS classList.add/remove */
+.hidden { display: none !important; }
+
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
 
 html, body {
@@ -367,7 +370,6 @@ html, body {
    GAME AREA (shown after menu is dismissed)
    ============================================================ */
 .game-area { width: 100%; display: flex; flex-direction: column; align-items: center; }
-.game-area.hidden { display: none; }
 
 .classroom-header {
     width: 100%;
