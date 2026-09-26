@@ -97,8 +97,9 @@ def main():
         "allocateUTF8"
     ]
     
-    exported_funcs_str = ",".join(exported_funcs)
-    exported_runtime_str = ",".join(exported_runtime)
+    import json
+    exported_funcs_json = json.dumps(exported_funcs)
+    exported_runtime_json = json.dumps(exported_runtime)
 
     out_js = os.path.join(out_dir, "biro_game.js")
     
@@ -120,8 +121,8 @@ def main():
         "-sUSE_GLFW=3",
         "-sALLOW_MEMORY_GROWTH=1",
         "-sSTACK_SIZE=1048576",
-        f"-sEXPORTED_FUNCTIONS={exported_funcs_str}",
-        f"-sEXPORTED_RUNTIME_METHODS={exported_runtime_str}",
+        f"-sEXPORTED_FUNCTIONS={exported_funcs_json}",
+        f"-sEXPORTED_RUNTIME_METHODS={exported_runtime_json}",
         "-o", out_js
     ]
 
