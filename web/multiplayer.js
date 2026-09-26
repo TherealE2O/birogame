@@ -1,45 +1,48 @@
 /**
  * ============================================================================
  * BIRO CLASH: School Desk Physics
- * WebRTC PeerJS Zero-Cost Multiplayer & Viral Social Bridge
+ * WebRTC PeerJS Zero-Cost Multiplayer + Pre-Game Menu Bridge
  * ============================================================================
- * 
- * 100% Free Forever Architecture:
- * - Peer-to-peer WebRTC DataChannels (zero game server data transmission)
- * - Public free cloud broker (0.peerjs.com) for initial SDP signaling exchange
- * - Google Public STUN servers for NAT traversal
- * - Host / Guest peer architecture with automatic URL query room joining
+ *
+ * 100% Free Architecture:
+ *  - Peer-to-peer WebRTC DataChannels (zero server data cost)
+ *  - Public PeerJS cloud broker (0.peerjs.com) for SDP exchange
+ *  - Google public STUN servers for NAT hole-punching
+ *  - QR code generated client-side (no backend)
  */
 
 (function () {
     'use strict';
 
-    // Game Network State
+    /* ------------------------------------------------------------------
+       Network State
+    ------------------------------------------------------------------ */
     const net = {
-        peer: null,
-        conn: null,
-        roomCode: '',
-        fullPeerId: '',
-        isHost: true,
-        isConnected: false,
-        wasmReady: false,
-        pendingJoinCode: null
+        peer:         null,
+        conn:         null,
+        roomCode:     '',
+        fullPeerId:   '',
+        isHost:       true,
+        isConnected:  false,
+        wasmReady:    false,
+        pendingJoinCode: null,
+        pendingSettings: null   // settings to apply once WASM is ready
     };
 
-    // Public STUN server configuration for global peer connectivity
     const PEER_CONFIG = {
         debug: 1,
         config: {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' },
                 { urls: 'stun:stun.services.mozilla.com' }
             ]
         }
     };
 
-    // Generate random 5-character readable classroom room code (no ambiguous 0/O or 1/I)
+    /* ------------------------------------------------------------------
+       Utilities
+    ------------------------------------------------------------------ */
     function generateRoomCode() {
         const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
         let code = '';
@@ -49,24 +52,13 @@
         return code;
     }
 
-    // Helper to pass JS string to Emscripten C char*
-    function c_setRoomCode(code) {
-        if (!window.Module || !Module._SetOnlineRoomCode) return;
-        if (typeof Module.stringToUTF8 === 'function' && typeof Module._malloc === 'function') {
-            const lengthBytes = (code.length * 4) + 1;
-            const ptr = Module._malloc(lengthBytes);
-            Module.stringToUTF8(code, ptr, lengthBytes);
-            Module._SetOnlineRoomCode(ptr);
-            Module._free(ptr);
-        } else if (typeof Module.allocateUTF8 === 'function') {
-            const ptr = Module.allocateUTF8(code);
-            Module._SetOnlineRoomCode(ptr);
-            if (Module._free) Module._free(ptr);
-        }
+    function getShareableRoomUrl() {
+        const url = new URL(window.location.href);
+        url.search = `?room=${net.roomCode}`;
+        return url.toString();
     }
 
-    // Show temporary floating school toast notification
-    function showToast(text, durationMs = 3500) {
+    function showToast(text, ms = 3500) {
         let toast = document.getElementById('toastNotice');
         if (!toast) {
             toast = document.createElement('div');
@@ -74,283 +66,334 @@
             toast.className = 'toast-notice';
             document.body.appendChild(toast);
         }
-        toast.innerHTML = `<span class="toast-icon">📋</span> <span>${text}</span>`;
+        toast.textContent = text;
         toast.classList.add('show');
-        clearTimeout(toast._timeout);
-        toast._timeout = setTimeout(() => {
-            toast.classList.remove('show');
-        }, durationMs);
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => toast.classList.remove('show'), ms);
     }
 
-    // Construct the direct shareable room URL
-    function getShareableRoomUrl() {
-        const url = new URL(window.location.href);
-        url.search = `?room=${net.roomCode}`;
-        return url.toString();
-    }
-
-    // Initialize Host Peer
-    function initHost(code = null) {
-        if (net.peer && !net.peer.destroyed) {
-            if (net.roomCode) return;
+    /* ------------------------------------------------------------------
+       WASM C bridge helpers
+    ------------------------------------------------------------------ */
+    function c_setRoomCode(code) {
+        if (!window.Module || !Module._SetOnlineRoomCode) return;
+        try {
+            const bytes = (code.length * 4) + 1;
+            const ptr   = Module._malloc(bytes);
+            Module.stringToUTF8(code, ptr, bytes);
+            Module._SetOnlineRoomCode(ptr);
+            Module._free(ptr);
+        } catch (e) {
+            console.warn('[MP] c_setRoomCode failed', e);
         }
+    }
 
-        net.isHost = true;
-        net.roomCode = (code || generateRoomCode()).toUpperCase();
+    function c_applyMenuSettings(s) {
+        if (!window.Module || !Module._SetMatchMode) return;
+        try {
+            Module._SetGameMode(s.mode || 0);
+            Module._SetMatchMode(s.matchType || 0);
+            Module._SetAIDifficulty(s.aiDiff || 1);
+            if (s.matchType === 2) {
+                Module._SetOnlineRole(net.isHost ? 1 : 0);
+            }
+        } catch (e) {
+            console.warn('[MP] c_applyMenuSettings error', e);
+        }
+    }
+
+    /* ------------------------------------------------------------------
+       QR Code helpers (uses qrcode.js from CDN)
+    ------------------------------------------------------------------ */
+    function renderQRCode(url) {
+        const box = document.getElementById('qrContainer');
+        if (!box) return;
+        box.innerHTML = '';
+        try {
+            new QRCode(box, {
+                text:           url,
+                width:          140,
+                height:         140,
+                colorDark:      '#163ca0',
+                colorLight:     '#faf6ec',
+                correctLevel:   QRCode.CorrectLevel.M
+            });
+        } catch (e) {
+            box.innerHTML = '<span style="font-size:12px;color:#555">QR library not loaded</span>';
+        }
+    }
+
+    /* ------------------------------------------------------------------
+       Host Peer
+    ------------------------------------------------------------------ */
+    function initHost(code) {
+        if (net.peer && !net.peer.destroyed && net.roomCode) return;
+
+        net.isHost    = true;
+        net.roomCode  = (code || generateRoomCode()).toUpperCase();
         net.fullPeerId = `biro-${net.roomCode}`;
 
-        console.log(`[Multiplayer] Initializing Host Peer: ${net.fullPeerId}`);
+        console.log(`[MP] Host initializing as ${net.fullPeerId}`);
 
         try {
             net.peer = new Peer(net.fullPeerId, PEER_CONFIG);
         } catch (e) {
-            console.error('[Multiplayer] Failed to create PeerJS host instance:', e);
+            console.error('[MP] Peer init failed', e);
             return;
         }
 
-        net.peer.on('open', (id) => {
-            console.log(`[Multiplayer] Host Peer Open with ID: ${id}`);
+        net.peer.on('open', () => {
+            console.log(`[MP] Host peer open: ${net.fullPeerId}`);
+            updateRoomCodeUI(net.roomCode);
             if (net.wasmReady) {
                 c_setRoomCode(net.roomCode);
-                if (Module._SetOnlineRole) Module._SetOnlineRole(1); // Host
+                if (Module._SetOnlineRole) Module._SetOnlineRole(1);
             }
         });
 
-        net.peer.on('connection', (connection) => {
-            console.log('[Multiplayer] Opponent guest connected!');
-            setupDataConnection(connection);
-        });
-
-        net.peer.on('error', (err) => {
-            console.warn('[Multiplayer] PeerJS error:', err.type, err);
-            if (err.type === 'unavailable-id') {
-                // Code collision, retry with a fresh code
-                console.log('[Multiplayer] Room code collision, generating fresh code...');
-                net.peer.destroy();
-                initHost();
-            }
-        });
-    }
-
-    // Initialize Guest Peer and join a host room
-    function initGuest(targetCode) {
-        net.isHost = false;
-        net.roomCode = targetCode.toUpperCase();
-        net.fullPeerId = `biro-guest-${generateRoomCode()}`;
-
-        console.log(`[Multiplayer] Initializing Guest Peer to join room: ${net.roomCode}`);
-
-        try {
-            net.peer = new Peer(net.fullPeerId, PEER_CONFIG);
-        } catch (e) {
-            console.error('[Multiplayer] Failed to create PeerJS guest instance:', e);
-            return;
-        }
-
-        net.peer.on('open', (id) => {
-            console.log(`[Multiplayer] Guest Peer Open (${id}), connecting to biro-${net.roomCode}...`);
-            if (net.wasmReady) {
-                c_setRoomCode(net.roomCode);
-                if (Module._SetOnlineRole) Module._SetOnlineRole(0); // Guest
-                if (Module._SetMatchMode) Module._SetMatchMode(2);  // MATCH_ONLINE_P2P
-            }
-
-            const targetPeerId = `biro-${net.roomCode}`;
-            const conn = net.peer.connect(targetPeerId, { reliable: true });
+        net.peer.on('connection', (conn) => {
+            console.log('[MP] Guest connected!');
             setupDataConnection(conn);
         });
 
         net.peer.on('error', (err) => {
-            console.error('[Multiplayer] Guest Peer error:', err);
-            showToast(`⚠️ Connection issue: ${err.type}`);
+            console.warn('[MP] Peer error:', err.type);
+            if (err.type === 'unavailable-id') {
+                net.peer.destroy();
+                initHost(); // retry with fresh code
+            }
         });
     }
 
-    // Configure WebRTC DataChannel callbacks
+    /* ------------------------------------------------------------------
+       Guest Peer
+    ------------------------------------------------------------------ */
+    function initGuest(targetCode) {
+        net.isHost    = false;
+        net.roomCode  = targetCode.toUpperCase();
+        net.fullPeerId = `biro-guest-${generateRoomCode()}`;
+
+        console.log(`[MP] Guest joining room: ${net.roomCode}`);
+
+        try {
+            net.peer = new Peer(net.fullPeerId, PEER_CONFIG);
+        } catch (e) {
+            console.error('[MP] Guest peer init failed', e);
+            return;
+        }
+
+        net.peer.on('open', () => {
+            if (net.wasmReady) {
+                c_setRoomCode(net.roomCode);
+                if (Module._SetOnlineRole) Module._SetOnlineRole(0);
+                if (Module._SetMatchMode) Module._SetMatchMode(2);
+            }
+            const conn = net.peer.connect(`biro-${net.roomCode}`, { reliable: true });
+            setupDataConnection(conn);
+        });
+
+        net.peer.on('error', (err) => {
+            console.error('[MP] Guest error:', err);
+            showToast(`Connection issue: ${err.type}`);
+            const badge = document.getElementById('joinStatus');
+            if (badge) { badge.textContent = 'Connection failed: ' + err.type; badge.className = 'conn-badge disconnected'; }
+        });
+    }
+
+    /* ------------------------------------------------------------------
+       Data Channel
+    ------------------------------------------------------------------ */
     function setupDataConnection(conn) {
         net.conn = conn;
 
         conn.on('open', () => {
-            console.log('[Multiplayer] DataChannel Connected!');
             net.isConnected = true;
-
+            console.log('[MP] DataChannel open!');
             if (net.wasmReady && Module._SetOnlineConnectionStatus) {
                 Module._SetOnlineConnectionStatus(1);
             }
+            // Update lobby UI
+            const badge = document.getElementById('connectionBadge');
+            if (badge) { badge.textContent = 'Opponent connected!'; badge.className = 'conn-badge connected'; }
+            const joinBadge = document.getElementById('joinStatus');
+            if (joinBadge) { joinBadge.textContent = 'Connected! Click Enter Classroom.'; joinBadge.className = 'conn-badge connected'; }
 
-            showToast('🎉 OPPONENT CONNECTED! DESK MATCH READY!', 4000);
-
-            // Send handshake
-            conn.send({
-                type: 'handshake',
-                isHost: net.isHost,
-                roomCode: net.roomCode
-            });
+            showToast('Opponent seated at the desk!');
+            conn.send({ type: 'handshake', isHost: net.isHost, roomCode: net.roomCode });
         });
 
-        conn.on('data', (data) => {
-            handleIncomingPacket(data);
-        });
+        conn.on('data', (data) => handleIncomingPacket(data));
 
         conn.on('close', () => {
-            console.log('[Multiplayer] DataChannel Closed');
             net.isConnected = false;
-            if (net.wasmReady && Module._SetOnlineConnectionStatus) {
-                Module._SetOnlineConnectionStatus(0);
-            }
-            showToast('⚠️ Opponent left the desk.', 4000);
+            if (net.wasmReady && Module._SetOnlineConnectionStatus) Module._SetOnlineConnectionStatus(0);
+            showToast('Opponent left the desk.');
+            const badge = document.getElementById('connectionBadge');
+            if (badge) { badge.textContent = 'Opponent disconnected'; badge.className = 'conn-badge waiting'; }
         });
 
-        conn.on('error', (err) => {
-            console.error('[Multiplayer] DataChannel error:', err);
-        });
+        conn.on('error', (err) => console.error('[MP] DataChannel error', err));
     }
 
-    // Process incoming network packets
+    /* ------------------------------------------------------------------
+       Packet Handling
+    ------------------------------------------------------------------ */
     function handleIncomingPacket(data) {
         if (!data || !data.type) return;
-
         switch (data.type) {
             case 'strike':
                 if (net.wasmReady && Module._ApplyRemoteStrike) {
-                    console.log(`[Multiplayer] Received Remote Strike: P${data.player + 1} angle=${data.angle.toFixed(2)} pow=${data.power.toFixed(2)}`);
                     Module._ApplyRemoteStrike(data.player, data.ptX, data.ptY, data.angle, data.power);
                 }
                 break;
-
             case 'sync':
                 if (net.wasmReady && Module._ApplyRemoteSync) {
                     Module._ApplyRemoteSync(data.player, data.x, data.y, data.angle, data.elim, data.score);
                 }
                 break;
-
             case 'restart':
                 if (net.wasmReady && Module._RestartMatchFromNetwork) {
-                    console.log(`[Multiplayer] Received Match Restart (mode=${data.mode}, stage=${data.stage}, table=${data.table})`);
                     Module._RestartMatchFromNetwork(data.mode, data.stage, data.table);
                 }
                 break;
-
             case 'handshake':
-                console.log('[Multiplayer] Received Handshake from opponent', data);
+                console.log('[MP] Handshake received', data);
                 break;
         }
     }
 
-    // Safe packet sender
     function sendPacket(data) {
-        if (net.conn && net.conn.open) {
-            net.conn.send(data);
-        }
+        if (net.conn && net.conn.open) net.conn.send(data);
     }
 
-    // =========================================================================
-    // C <-> JS Bridge Functions (Called by Raylib C code via EM_JS)
-    // =========================================================================
+    /* ------------------------------------------------------------------
+       UI helper: update the menu room code display + QR
+    ------------------------------------------------------------------ */
+    function updateRoomCodeUI(code) {
+        const el = document.getElementById('displayRoomCode');
+        if (el) el.textContent = code;
+        renderQRCode(getShareableRoomUrl());
+    }
 
-    // Broadcast a flick strike to peer
-    window.onLocalStrike = function (player, ptX, ptY, angle, power) {
-        sendPacket({
-            type: 'strike',
-            player: player,
-            ptX: ptX,
-            ptY: ptY,
-            angle: angle,
-            power: power
-        });
+    /* ------------------------------------------------------------------
+       C <-> JS Bridge (called by Raylib/Emscripten via EM_JS)
+    ------------------------------------------------------------------ */
+    window.onLocalStrike = function(player, ptX, ptY, angle, power) {
+        sendPacket({ type: 'strike', player, ptX, ptY, angle, power });
     };
 
-    // Broadcast table settle synchronization to peer
-    window.onLocalSync = function (player, x, y, angle, elim, score) {
-        // Only host sends definitive sync updates to prevent oscillation
-        if (net.isHost) {
-            sendPacket({
-                type: 'sync',
-                player: player,
-                x: x,
-                y: y,
-                angle: angle,
-                elim: elim,
-                score: score
-            });
-        }
+    window.onLocalSync = function(player, x, y, angle, elim, score) {
+        if (net.isHost) sendPacket({ type: 'sync', player, x, y, angle, elim, score });
     };
 
-    // Broadcast round restart
-    window.onLocalRoundRestart = function (mode, stage, table) {
-        sendPacket({
-            type: 'restart',
-            mode: mode,
-            stage: stage,
-            table: table
-        });
+    window.onLocalRoundRestart = function(mode, stage, table) {
+        sendPacket({ type: 'restart', mode, stage, table });
     };
 
-    // Copy room link to clipboard
-    window.copyRoomLink = function () {
-        if (!net.roomCode) {
-            initHost();
-        }
-        const inviteUrl = getShareableRoomUrl();
-        navigator.clipboard.writeText(inviteUrl).then(() => {
-            showToast('📋 INVITE LINK COPIED! Paste to friend on Twitter / WhatsApp!');
+    window.copyRoomLink = function() {
+        if (!net.roomCode) initHost();
+        navigator.clipboard.writeText(getShareableRoomUrl()).then(() => {
+            showToast('Invite link copied! Paste it to your friend.');
         }).catch(() => {
-            prompt('Copy this Biro Clash invite link:', inviteUrl);
+            prompt('Copy this Biro Clash invite link:', getShareableRoomUrl());
         });
     };
 
-    // Launch Twitter / X challenge tweet intent
-    window.tweetChallenge = function () {
-        if (!net.roomCode) {
-            initHost();
-        }
-        const inviteUrl = getShareableRoomUrl();
-        const tweetText = `⚡ Think your biro flicking skills are elite? Play me in BIRO CLASH on a school desk right now in your browser!\n\n🎮 1-Click P2P Match: ${inviteUrl}\n\n#BiroClash #Box2D #WebAssembly #IndieDev`;
-        const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
-        window.open(tweetUrl, '_blank', 'noopener,noreferrer');
+    window.tweetChallenge = function() {
+        if (!net.roomCode) initHost();
+        const url  = getShareableRoomUrl();
+        const text = `Think your biro skills are elite? Play me in BIRO CLASH on a school desk right now!\n\n${url}\n\n#BiroClash #Box2D #WebAssembly #IndieDev`;
+        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
     };
 
-    // Request room code when user enters online mode
-    window.initOnlineHost = function () {
-        if (!net.roomCode) {
+    window.initOnlineHost = function() {
+        if (!net.roomCode) initHost();
+        else c_setRoomCode(net.roomCode);
+    };
+
+    /* ------------------------------------------------------------------
+       Menu bridge functions (called from index.html inline scripts)
+    ------------------------------------------------------------------ */
+
+    // Called when user selects "Online Multiplayer" in the menu
+    window.menuInitHost = function() {
+        if (!net.peer || net.peer.destroyed) {
             initHost();
         } else {
-            c_setRoomCode(net.roomCode);
+            updateRoomCodeUI(net.roomCode);
         }
     };
 
-    // Initialize multiplayer on page load
-    window.addEventListener('DOMContentLoaded', () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const room = urlParams.get('room');
+    // Called when user taps "Join Desk" in the menu
+    window.menuConnectAsGuest = function(code) {
+        net.pendingJoinCode = code.toUpperCase();
+        initGuest(net.pendingJoinCode);
+    };
 
-        if (room && room.trim().length > 0) {
-            net.pendingJoinCode = room.trim().toUpperCase();
-            console.log(`[Multiplayer] Detected room code in URL: ${net.pendingJoinCode}`);
-            showToast(`Joining desk duel room ${net.pendingJoinCode}...`);
+    // Returns the shareable URL for the current room
+    window.menuGetShareUrl = function() {
+        return getShareableRoomUrl();
+    };
+
+    // Called by launchGame() in index.html
+    window.applyMenuSettings = function() {
+        const s = window.menuSel || { mode: 0, matchType: 0, aiDiff: 1, onlineRole: 'host' };
+
+        if (net.wasmReady) {
+            c_applyMenuSettings(s);
+        } else {
+            // Store; will be applied in onWasmInitialized
+            net.pendingSettings = s;
         }
-    });
+    };
 
-    // Hook called when WebAssembly runtime has finished compiling & loading
-    window.onWasmInitialized = function () {
-        console.log('[Multiplayer] WASM runtime ready.');
+    /* ------------------------------------------------------------------
+       WASM Runtime Ready callback
+    ------------------------------------------------------------------ */
+    window.onWasmInitialized = function() {
+        console.log('[MP] WASM runtime ready.');
         net.wasmReady = true;
 
-        if (net.pendingJoinCode) {
-            initGuest(net.pendingJoinCode);
-        } else {
-            // Default setup: generate host room code ready for sharing
-            initHost();
+        // Apply any settings chosen in the menu that arrived before WASM was ready
+        const s = net.pendingSettings || window.menuSel;
+        if (s) {
+            c_applyMenuSettings(s);
+        }
+
+        // Handle online connection setup
+        if (s && s.matchType === 2) {
+            if (s.onlineRole === 'join' && net.pendingJoinCode) {
+                // Already connecting as guest (was triggered from menuConnectAsGuest)
+                c_setRoomCode(net.pendingJoinCode);
+                if (Module._SetOnlineRole) Module._SetOnlineRole(0);
+                if (Module._SetMatchMode) Module._SetMatchMode(2);
+            } else {
+                // Host
+                if (net.roomCode) {
+                    c_setRoomCode(net.roomCode);
+                    if (Module._SetOnlineRole) Module._SetOnlineRole(1);
+                } else {
+                    initHost();
+                }
+            }
+        } else if (!s || s.matchType !== 2) {
+            // Non-online: still generate a host code silently so copy-link works
+            if (!net.roomCode) initHost();
+        }
+
+        // Re-apply connection status if already connected
+        if (net.isConnected && Module._SetOnlineConnectionStatus) {
+            Module._SetOnlineConnectionStatus(1);
         }
     };
 
-    // Global toggle fullscreen helper
-    window.toggleGameFullscreen = function () {
+    /* ------------------------------------------------------------------
+       Fullscreen
+    ------------------------------------------------------------------ */
+    window.toggleGameFullscreen = function() {
         const canvas = document.getElementById('canvas');
         if (!document.fullscreenElement) {
-            if (canvas.requestFullscreen) canvas.requestFullscreen();
-            else if (canvas.webkitRequestFullscreen) canvas.webkitRequestFullscreen();
-            else if (canvas.msRequestFullscreen) canvas.msRequestFullscreen();
+            (canvas.requestFullscreen || canvas.webkitRequestFullscreen || canvas.msRequestFullscreen || function(){}).call(canvas);
         } else {
             if (document.exitFullscreen) document.exitFullscreen();
         }

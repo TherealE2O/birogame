@@ -78,6 +78,7 @@ def main():
         "_ApplyRemoteStrike",
         "_ApplyRemoteSync",
         "_SetMatchMode",
+        "_SetGameMode",
         "_SetAIDifficulty",
         "_SetOnlineRole",
         "_SetOnlineRoomCode",

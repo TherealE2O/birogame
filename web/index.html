@@ -3,54 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BIRO CLASH - School Desk Physics | Box2D v3 & Raylib WebAssembly</title>
-    
-    <!-- Meta tags for rich viral Twitter / Open Graph cards -->
-    <meta name="description" content="Authentic Nigerian school desk Biro pen flicking physics game! Powered by Box2D v3 & Raylib 6.0 WebAssembly. Play 100% free with 1-click P2P WebRTC multiplayer or solo vs AI bots!">
+    <title>BIRO CLASH - School Desk Physics</title>
+
+    <!-- Rich social cards -->
+    <meta name="description" content="Flick your biro across the school desk. Box2D v3 physics, 100% free P2P multiplayer.">
     <meta property="og:title" content="BIRO CLASH - School Desk Physics">
-    <meta property="og:description" content="Flick your biro, trigger Box2D v3 impulse collisions, and knock your opponent off the school desk! 100% Free P2P multiplayer.">
+    <meta property="og:description" content="Nigerian school desk biro flicking game. Box2D v3 + Raylib WebAssembly. Free P2P multiplayer.">
     <meta property="og:type" content="game">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="BIRO CLASH: School Desk Physics">
-    <meta name="twitter:description" content="Flick your biro, trigger Box2D v3 impulse collisions, and knock your opponent off the school desk! 100% Free P2P multiplayer.">
+    <meta name="twitter:description" content="Flick your biro, trigger Box2D v3 physics collisions, knock opponent off the desk! Free P2P multiplayer.">
 
-    <!-- Fonts & Styling -->
+    <!-- Fonts: Kalam = handwriting title, Patrick Hand = body text -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Kalam:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 
-    <!-- Free Public PeerJS library for zero-cost browser-to-browser WebRTC DataChannels -->
+    <!-- QR code generation (free CDN, no server needed) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- PeerJS WebRTC -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
 
-    <!-- Classroom Header -->
+<!-- ============================================================ -->
+<!--  PRE-GAME LOBBY / MENU                                       -->
+<!--  Shown immediately on page load. WASM compiles in background.-->
+<!-- ============================================================ -->
+<div id="mainMenu" class="menu-backdrop">
+
+    <!-- Notebook card -->
+    <div class="notebook-card">
+
+        <!-- Spiral binding holes at top -->
+        <div class="spiral-row">
+            <div class="spiral-hole"></div><div class="spiral-hole"></div>
+            <div class="spiral-hole"></div><div class="spiral-hole"></div>
+            <div class="spiral-hole"></div><div class="spiral-hole"></div>
+            <div class="spiral-hole"></div><div class="spiral-hole"></div>
+            <div class="spiral-hole"></div><div class="spiral-hole"></div>
+        </div>
+
+        <!-- Title -->
+        <div class="menu-title-block">
+            <div class="menu-title">BIRO CLASH</div>
+            <div class="menu-subtitle">School Desk Physics &nbsp;·&nbsp; Box2D v3 + Raylib WebAssembly</div>
+        </div>
+
+        <div class="menu-divider"></div>
+
+        <!-- SECTION 1: Game Mode -->
+        <div class="menu-section">
+            <div class="menu-label">Game Mode</div>
+            <div class="pill-row" id="modeRow">
+                <button class="pill pill-blue active" data-group="mode" data-val="0" onclick="selectPill(this)">1v1 Duel</button>
+                <button class="pill pill-blue" data-group="mode" data-val="1" onclick="selectPill(this)">2v2 Teams</button>
+                <button class="pill pill-blue" data-group="mode" data-val="2" onclick="selectPill(this)">Battle Royale</button>
+            </div>
+        </div>
+
+        <!-- SECTION 2: Match Type -->
+        <div class="menu-section">
+            <div class="menu-label">Match Type</div>
+            <div class="pill-row" id="matchRow">
+                <button class="pill pill-green active" data-group="match" data-val="0" onclick="selectPill(this)">vs AI Bot</button>
+                <button class="pill pill-green" data-group="match" data-val="1" onclick="selectPill(this)">Local 2-Player</button>
+                <button class="pill pill-green" data-group="match" data-val="2" onclick="selectPill(this)">Online Multiplayer</button>
+            </div>
+        </div>
+
+        <!-- SECTION 3A: AI Difficulty (only when "vs AI" is chosen) -->
+        <div class="menu-section" id="aiSection">
+            <div class="menu-label">AI Difficulty</div>
+            <div class="pill-row">
+                <button class="pill pill-red" data-group="diff" data-val="0" onclick="selectPill(this)">Freshman</button>
+                <button class="pill pill-red active" data-group="diff" data-val="1" onclick="selectPill(this)">Desk Mate</button>
+                <button class="pill pill-red" data-group="diff" data-val="2" onclick="selectPill(this)">Prefect</button>
+                <button class="pill pill-red" data-group="diff" data-val="3" onclick="selectPill(this)">Physics Prodigy</button>
+            </div>
+        </div>
+
+        <!-- SECTION 3B: Online Lobby (only when "Online Multiplayer" is chosen) -->
+        <div class="menu-section hidden" id="onlineSection">
+            <div class="menu-label">Online Lobby</div>
+            <div class="online-tabs">
+                <button class="online-tab active" id="tabHost" onclick="switchOnlineTab('host')">Host a Desk</button>
+                <button class="online-tab" id="tabJoin" onclick="switchOnlineTab('join')">Join a Desk</button>
+            </div>
+
+            <!-- HOST panel -->
+            <div id="hostPanel" class="online-panel">
+                <div class="room-code-display">
+                    <div class="room-code-label">Your Room Code</div>
+                    <div class="room-code" id="displayRoomCode">- - - - -</div>
+                    <div class="room-code-hint">Share this code with your friend so they can join</div>
+                </div>
+                <div class="host-row">
+                    <div id="qrContainer" class="qr-box">
+                        <div class="qr-placeholder">QR code will appear here once code is ready</div>
+                    </div>
+                    <div class="host-actions">
+                        <button class="action-btn btn-copy" onclick="menuCopyLink()">Copy Invite Link</button>
+                        <button class="action-btn btn-tweet" onclick="menuTweet()">Post on X / Twitter</button>
+                        <div id="connectionBadge" class="conn-badge waiting">Waiting for opponent...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- JOIN panel -->
+            <div id="joinPanel" class="online-panel hidden">
+                <div class="join-form">
+                    <label class="join-label" for="joinCodeInput">Enter Room Code</label>
+                    <input id="joinCodeInput" class="join-input" type="text"
+                           maxlength="5" placeholder="e.g. PEN82"
+                           autocomplete="off" autocorrect="off" spellcheck="false"
+                           oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                    <button class="action-btn btn-copy" style="margin-top:10px;" onclick="menuJoinRoom()">Join Desk</button>
+                    <div id="joinStatus" class="conn-badge waiting hidden">Connecting...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="menu-divider"></div>
+
+        <!-- START BUTTON -->
+        <div class="menu-start-row">
+            <div id="wasmStatus" class="wasm-status">Loading physics engine...</div>
+            <button class="start-btn" id="startBtn" onclick="launchGame()" disabled>
+                Enter Classroom
+            </button>
+        </div>
+
+        <!-- Footer note -->
+        <div class="menu-footer">
+            100% Free &nbsp;·&nbsp; No servers &nbsp;·&nbsp; P2P WebRTC &nbsp;·&nbsp;
+            <a href="https://github.com/TherealE2O/birogame" target="_blank" rel="noopener">GitHub</a>
+        </div>
+
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!--  GAME CANVAS AREA (hidden until menu dismissed)              -->
+<!-- ============================================================ -->
+<div id="gameArea" class="game-area hidden">
     <header class="classroom-header">
         <div class="brand-section">
             <h1 class="brand-title">BIRO CLASH</h1>
             <span class="brand-subtitle">School Desk Physics</span>
         </div>
-
         <div class="header-badges">
             <span class="badge badge-box2d">Box2D v3.2.0 + Raylib 6.0</span>
-            <span class="badge badge-free">100% Free P2P WebRTC ($0.00)</span>
-            <button class="badge badge-github" onclick="window.copyRoomLink()">📋 Copy Room</button>
-            <button class="badge badge-github" onclick="window.tweetChallenge()">⚡ Tweet Link</button>
+            <span class="badge badge-free">100% Free P2P ($0.00)</span>
+            <button class="badge badge-github" onclick="window.copyRoomLink()">Copy Room</button>
+            <button class="badge badge-github" onclick="window.tweetChallenge()">Tweet Link</button>
         </div>
     </header>
 
-    <!-- Game Canvas Viewport Frame -->
     <main class="game-container">
         <div class="canvas-frame">
             <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 
-            <!-- Loading Paper Overlay -->
             <div id="loadingOverlay" class="loading-overlay">
                 <div class="loading-paper">
-                    <div class="loading-pen-icon">🖊️</div>
+                    <div class="loading-pen-icon">&#128394;</div>
                     <div class="loading-title">OPENING SCHOOL DESK...</div>
-                    <div class="loading-subtitle">Compiling Box2D v3 & Raylib WebAssembly</div>
+                    <div class="loading-subtitle">Compiling Box2D v3 &amp; Raylib WebAssembly</div>
                     <div class="progress-track">
                         <div id="progressBar" class="progress-bar"></div>
                     </div>
@@ -60,11 +179,10 @@
         </div>
     </main>
 
-    <!-- Quick Action & Shortcut Tray -->
     <footer class="action-tray">
         <div class="tray-shortcuts">
             <span>Controls:</span>
-            <span><span class="kbd">CLICK</span> Aim/Power</span>
+            <span><span class="kbd">CLICK / TOUCH</span> Aim + Charge</span>
             <span><span class="kbd">TAB</span> Arena</span>
             <span><span class="kbd">M</span> Mode</span>
             <span><span class="kbd">S</span> Axis</span>
@@ -73,90 +191,211 @@
             <span><span class="kbd">P</span> Market</span>
             <span><span class="kbd">R</span> Reset</span>
         </div>
-
         <div class="tray-buttons">
-            <button class="btn-tray btn-copy" onclick="window.copyRoomLink()">
-                📋 Copy Invite Link
-            </button>
-            <button class="btn-tray btn-twitter" onclick="window.tweetChallenge()">
-                𝕏 Challenge on X
-            </button>
-            <button class="btn-tray btn-fullscreen" onclick="window.toggleGameFullscreen()">
-                ⛶ Fullscreen
-            </button>
+            <button class="btn-tray btn-copy" onclick="window.copyRoomLink()">Copy Invite Link</button>
+            <button class="btn-tray btn-twitter" onclick="window.tweetChallenge()">&#x1D54F; Challenge on X</button>
+            <button class="btn-tray btn-fullscreen" onclick="window.toggleGameFullscreen()">&#x26F6; Fullscreen</button>
         </div>
     </footer>
+</div>
 
-    <!-- PeerJS WebRTC Multiplayer script -->
-    <script src="multiplayer.js"></script>
+<!-- Floating toast -->
+<div id="toastNotice" class="toast-notice"></div>
 
-    <!-- Emscripten Module Glue -->
-    <script>
-        var statusElement = document.getElementById('loadingStatus');
-        var progressBar = document.getElementById('progressBar');
-        var loadingOverlay = document.getElementById('loadingOverlay');
+<!-- PeerJS Multiplayer Logic -->
+<script src="multiplayer.js"></script>
 
-        var Module = {
-            preRun: [],
-            postRun: [],
-            print: (function() {
-                return function(text) {
-                    if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
-                    console.log(text);
-                };
-            })(),
-            printErr: function(text) {
+<!-- Emscripten Module Configuration -->
+<script>
+    var statusElement   = document.getElementById('loadingStatus');
+    var progressBar     = document.getElementById('progressBar');
+    var loadingOverlay  = document.getElementById('loadingOverlay');
+
+    var Module = {
+        preRun: [],
+        postRun: [],
+        print: (function() {
+            return function(text) {
                 if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
-                console.error(text);
-            },
-            canvas: (function() {
-                var canvas = document.getElementById('canvas');
-                canvas.addEventListener("webglcontextlost", function(e) { 
-                    alert('WebGL context lost. Please reload the page.'); 
-                    e.preventDefault(); 
-                }, false);
-                return canvas;
-            })(),
-            setStatus: function(text) {
-                if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
-                if (text === Module.setStatus.last.text) return;
-                var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
-                var now = Date.now();
-                if (m && now - Module.setStatus.last.time < 30) return; // if this is a progress update, skip if too fast
-                Module.setStatus.last.time = now;
-                Module.setStatus.last.text = text;
-
-                if (m) {
-                    text = m[1];
-                    var progress = parseInt(m[2]) / parseInt(m[4]) * 100;
-                    if (progressBar) progressBar.style.width = progress + '%';
-                }
-                if (statusElement) statusElement.innerText = text;
-            },
-            totalDependencies: 0,
-            monitorRunDependencies: function(left) {
-                this.totalDependencies = Math.max(this.totalDependencies, left);
-                Module.setStatus(left ? 'Preparing desk stationery... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All assets ready.');
-            },
-            onRuntimeInitialized: function() {
-                console.log("[WASM] Box2D v3 & Raylib 6.0 runtime initialized successfully!");
-                if (loadingOverlay) {
-                    loadingOverlay.classList.add('hidden');
-                }
-                if (typeof window.onWasmInitialized === 'function') {
-                    window.onWasmInitialized();
-                }
+                console.log(text);
+            };
+        })(),
+        printErr: function(text) {
+            if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+            console.error(text);
+        },
+        canvas: (function() {
+            var canvas = document.getElementById('canvas');
+            canvas.addEventListener('webglcontextlost', function(e) {
+                alert('WebGL context lost. Please reload the page.');
+                e.preventDefault();
+            }, false);
+            return canvas;
+        })(),
+        setStatus: function(text) {
+            if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+            if (text === Module.setStatus.last.text) return;
+            var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+            var now = Date.now();
+            if (m && now - Module.setStatus.last.time < 30) return;
+            Module.setStatus.last.time = now;
+            Module.setStatus.last.text = text;
+            if (m) {
+                text = m[1];
+                var progress = parseInt(m[2]) / parseInt(m[4]) * 100;
+                if (progressBar) progressBar.style.width = progress + '%';
             }
-        };
+            if (statusElement) statusElement.innerText = text;
+        },
+        totalDependencies: 0,
+        monitorRunDependencies: function(left) {
+            this.totalDependencies = Math.max(this.totalDependencies, left);
+            Module.setStatus(left
+                ? 'Preparing desk stationery... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')'
+                : 'All assets ready.');
+        },
+        onRuntimeInitialized: function() {
+            console.log('[WASM] Box2D v3 & Raylib 6.0 runtime initialized!');
+            if (loadingOverlay) loadingOverlay.classList.add('hidden');
+            document.getElementById('wasmStatus').textContent = 'Physics engine ready!';
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').textContent = 'Enter Classroom  ▶';
+            if (typeof window.onWasmInitialized === 'function') window.onWasmInitialized();
+        }
+    };
 
-        Module.setStatus('Downloading physics engine...');
-        window.onerror = function(event) {
-            Module.setStatus('Exception thrown, see JavaScript console');
-            if (loadingOverlay) loadingOverlay.classList.remove('hidden');
-        };
-    </script>
+    Module.setStatus('Downloading physics engine...');
+    window.onerror = function() {
+        Module.setStatus('Exception thrown — see console');
+        if (loadingOverlay) loadingOverlay.classList.remove('hidden');
+    };
+</script>
 
-    <!-- Load the compiled WebAssembly JS bundle -->
-    <script async type="text/javascript" src="biro_game.js"></script>
+<!-- Load WASM (starts in background while user is on menu) -->
+<script async type="text/javascript" src="biro_game.js"></script>
+
+<!-- Menu logic -->
+<script>
+/* ----------------------------------------------------------------
+   Menu state
+---------------------------------------------------------------- */
+var menuSel = {
+    mode:      0,   // 0=1v1  1=2v2  2=Royale
+    matchType: 0,   // 0=AI   1=Local  2=Online
+    aiDiff:    1,   // 0-3
+    onlineRole:'host',
+    joinCode:  ''
+};
+
+function selectPill(btn) {
+    var group = btn.dataset.group;
+    var val   = parseInt(btn.dataset.val, 10);
+
+    // deselect siblings
+    document.querySelectorAll('[data-group="' + group + '"]').forEach(function(b) {
+        b.classList.remove('active');
+    });
+    btn.classList.add('active');
+
+    if (group === 'mode')  { menuSel.mode      = val; }
+    if (group === 'match') { menuSel.matchType  = val; onMatchTypeChange(val); }
+    if (group === 'diff')  { menuSel.aiDiff     = val; }
+}
+
+function onMatchTypeChange(val) {
+    document.getElementById('aiSection').classList.toggle('hidden',   val !== 0);
+    document.getElementById('onlineSection').classList.toggle('hidden', val !== 2);
+    if (val === 2) {
+        window.menuInitHost();   // start generating room code immediately
+    }
+}
+
+function switchOnlineTab(tab) {
+    menuSel.onlineRole = tab;
+    document.getElementById('tabHost').classList.toggle('active', tab === 'host');
+    document.getElementById('tabJoin').classList.toggle('active', tab === 'join');
+    document.getElementById('hostPanel').classList.toggle('hidden', tab !== 'host');
+    document.getElementById('joinPanel').classList.toggle('hidden', tab !== 'join');
+}
+
+function menuCopyLink() {
+    var url = window.menuGetShareUrl();
+    navigator.clipboard.writeText(url).then(function() {
+        showMenuToast('Invite link copied!');
+    }).catch(function() {
+        prompt('Copy this link:', url);
+    });
+}
+
+function menuTweet() {
+    var url  = window.menuGetShareUrl();
+    var text = 'Think your biro skills are elite? Play me in BIRO CLASH on a school desk right now!\n\n' + url + '\n\n#BiroClash #Box2D #WebAssembly';
+    window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
+}
+
+function menuJoinRoom() {
+    var code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+    if (code.length < 2) { showMenuToast('Enter a valid room code'); return; }
+    menuSel.joinCode = code;
+    document.getElementById('joinStatus').classList.remove('hidden');
+    document.getElementById('joinStatus').textContent = 'Connecting to desk ' + code + '...';
+    window.menuConnectAsGuest(code);
+}
+
+function showMenuToast(msg) {
+    var el = document.getElementById('toastNotice');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(function() { el.classList.remove('show'); }, 3000);
+}
+
+/* ----------------------------------------------------------------
+   Launch: hide menu, show game area, apply settings to WASM
+---------------------------------------------------------------- */
+function launchGame() {
+    // If online + join mode but no code entered yet, bail
+    if (menuSel.matchType === 2 && menuSel.onlineRole === 'join') {
+        var code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+        if (code.length < 2) { showMenuToast('Enter a valid room code first'); return; }
+        menuSel.joinCode = code;
+    }
+
+    document.getElementById('mainMenu').classList.add('hidden');
+    document.getElementById('gameArea').classList.remove('hidden');
+
+    // If WASM not ready yet, show loading screen; settings applied in onWasmInitialized callback
+    if (!window.Module || !Module._SetMatchMode) {
+        document.getElementById('loadingOverlay').classList.remove('hidden');
+    }
+
+    window.applyMenuSettings();
+}
+
+/* ----------------------------------------------------------------
+   URL room-code auto-join (someone clicked an invite link)
+---------------------------------------------------------------- */
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var room   = params.get('room');
+    if (room && room.trim().length > 0) {
+        // Pre-fill the join form and auto-switch to Online > Join
+        menuSel.matchType  = 2;
+        menuSel.onlineRole = 'join';
+        menuSel.joinCode   = room.trim().toUpperCase();
+
+        // Activate the correct pills
+        document.querySelectorAll('[data-group="match"]').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelector('[data-group="match"][data-val="2"]').classList.add('active');
+        document.getElementById('aiSection').classList.add('hidden');
+        document.getElementById('onlineSection').classList.remove('hidden');
+        switchOnlineTab('join');
+        document.getElementById('joinCodeInput').value = menuSel.joinCode;
+        document.getElementById('joinStatus').classList.remove('hidden');
+        document.getElementById('joinStatus').textContent = 'Ready to join desk ' + menuSel.joinCode;
+    }
+})();
+</script>
+
 </body>
 </html>

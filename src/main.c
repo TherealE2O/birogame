@@ -478,6 +478,10 @@ typedef struct {
     const char* autoScreenshotPath;
     bool autotestMode;
     bool startInMarket;
+
+    // Mobile touch aiming: did the current mouse/finger press BEGIN on the active pen?
+    // If yes, dragging slides the contact reticle; it does NOT start power charging.
+    bool touchStartedOnPen;
 } GameContext;
 
 static GameContext g_game = {0};
@@ -2268,12 +2272,64 @@ static void UpdateDrawFrame(void) {
             else if (g_game.matchType == MATCH_ONLINE_P2P) isLocalTurn = (g_game.activePlayer == g_game.onlineLocalPlayerIndex);
 
             if (isLocalTurn) {
+                // ---- Contact Point PRESET BUTTONS (visible before charging) ----
+                // These large thumb-friendly buttons snap the strike reticle and are
+                // checked first so they never accidentally start power-charging.
+                if (!g_game.isCharging && !clickHandled) {
+                    const PenModelDef* presDef = &g_penModels[currentBiro->modelId];
+                    Rectangle btnTail   = { (float)(SCREEN_WIDTH/2 - 345), 718.0f, 210.0f, 52.0f };
+                    Rectangle btnCenter = { (float)(SCREEN_WIDTH/2 - 107), 718.0f, 210.0f, 52.0f };
+                    Rectangle btnTip    = { (float)(SCREEN_WIDTH/2 + 131), 718.0f, 210.0f, 52.0f };
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                        if (CheckCollisionPointRec(mouse, btnTail)) {
+                            g_game.chosenStrikePoint = (b2Vec2){ -presDef->halfLength * 0.85f, 0.0f };
+                            clickHandled = true;
+                            if (g_audio.audioReady) PlaySound(g_audio.sndTick);
+                        } else if (CheckCollisionPointRec(mouse, btnCenter)) {
+                            g_game.chosenStrikePoint = (b2Vec2){ 0.0f, 0.0f };
+                            clickHandled = true;
+                            if (g_audio.audioReady) PlaySound(g_audio.sndTick);
+                        } else if (CheckCollisionPointRec(mouse, btnTip)) {
+                            g_game.chosenStrikePoint = (b2Vec2){ presDef->halfLength * 0.85f, 0.0f };
+                            clickHandled = true;
+                            if (g_audio.audioReady) PlaySound(g_audio.sndTick);
+                        }
+                    }
+                }
+
+                // ---- Cancel button during charging (mobile: no right-click) ----
+                if (g_game.isCharging && !clickHandled) {
+                    Rectangle cancelBtnLogic = { (float)(SCREEN_WIDTH/2 + 183), 720.0f, 96.0f, 34.0f };
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse, cancelBtnLogic)) {
+                        g_game.isCharging = false;
+                        g_game.touchStartedOnPen = false;
+                        clickHandled = true;
+                        if (g_audio.audioReady) PlaySound(g_audio.sndTick);
+                    }
+                }
+
                 if (!g_game.isCharging) {
                     g_game.arrowAngle += 3.6f * dt;
                     if (g_game.arrowAngle > 2.0f * PI) g_game.arrowAngle -= 2.0f * PI;
 
-                    bool mouseOverPen = IsPointInBiro(currentBiro, mouseWorld, 0.08f);
-                    if (mouseOverPen) {
+                    // Expanded to 0.40 m (~45 px) so thumbs can grab the pen reliably
+                    bool mouseOverPen = IsPointInBiro(currentBiro, mouseWorld, 0.40f);
+
+                    // On the first frame of a press, remember whether it started on the pen.
+                    // If yes → dragging slides the contact reticle; the charge does NOT begin.
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !clickHandled) {
+                        g_game.touchStartedOnPen = mouseOverPen;
+                    }
+
+                    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && g_game.touchStartedOnPen && !clickHandled) {
+                        // Finger sliding along the pen barrel – update contact point
+                        b2Vec2 local = b2Body_GetLocalPoint(currentBiro->bodyId, mouseWorld);
+                        const PenModelDef* def = &g_penModels[currentBiro->modelId];
+                        local.x = Clamp(local.x, -def->halfLength + 0.05f, def->halfLength - 0.05f);
+                        local.y = 0.0f;
+                        g_game.chosenStrikePoint = local;
+                    } else if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT) && mouseOverPen) {
+                        // Desktop hover (mouse not held) still works as before
                         b2Vec2 local = b2Body_GetLocalPoint(currentBiro->bodyId, mouseWorld);
                         const PenModelDef* def = &g_penModels[currentBiro->modelId];
                         local.x = Clamp(local.x, -def->halfLength + 0.05f, def->halfLength - 0.05f);
@@ -2282,7 +2338,8 @@ static void UpdateDrawFrame(void) {
                     }
                 }
 
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !g_game.isCharging && !clickHandled) {
+                // Start charging ONLY if the press did NOT start on the pen
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !g_game.isCharging && !clickHandled && !g_game.touchStartedOnPen) {
                     g_game.isCharging = true;
                     g_game.chargeTimer = 0.0f;
                     g_game.lockedArrowAngle = g_game.arrowAngle;
@@ -2728,6 +2785,47 @@ static void UpdateDrawFrame(void) {
             const char* pTxt = TextFormat("FLICK IMPULSE: %d%%  (RELEASE TO STRIKE!)", (int)(powerFrac * 100.0f));
             float txtW = MeasureSchoolText(pTxt, 15);
             DrawSchoolText(pTxt, SCREEN_WIDTH / 2 - txtW / 2, pBarY - 20, 15, (Color){ 255, 235, 175, 255 });
+
+            // [x CANCEL] button – mobile-friendly, right of the ruler bar
+            Rectangle cancelBtnR = { (float)(pBarX + pBarW + 12), (float)(pBarY - 4), 96.0f, (float)(pBarH + 8) };
+            bool hoverCancel = CheckCollisionPointRec(mouse, cancelBtnR);
+            DrawRectangleRounded(cancelBtnR, 0.18f, 4, hoverCancel ? (Color){ 195, 34, 42, 255 } : (Color){ 250, 240, 240, 255 });
+            DrawRectangleRoundedLines(cancelBtnR, 0.18f, 4, (Color){ 195, 34, 42, 255 });
+            DrawSchoolTextTitle("x CANCEL", cancelBtnR.x + 10, cancelBtnR.y + 7, 13, hoverCancel ? WHITE : (Color){ 195, 34, 42, 255 });
+        }
+
+        // ---- Contact Point PRESET BUTTONS (drawn during aiming, before charging) ----
+        if (!g_game.isCharging && !currentBiro->isEliminated) {
+            const PenModelDef* def = &g_penModels[currentBiro->modelId];
+
+            typedef struct { Rectangle r; float strikeX; const char* label; const char* sub; Color col; } PresetBtn;
+            PresetBtn presets[3] = {
+                { { (float)(SCREEN_WIDTH/2 - 345), 718.0f, 210.0f, 52.0f }, -def->halfLength * 0.85f, "TAIL  /  SPIN",   "Max Torque", (Color){ 22,  60,  160, 255 } },
+                { { (float)(SCREEN_WIDTH/2 - 107), 718.0f, 210.0f, 52.0f }, 0.0f,                    "CENTER  /  PUSH", "Direct Thrust", (Color){ 25,  135, 65,  255 } },
+                { { (float)(SCREEN_WIDTH/2 + 131), 718.0f, 210.0f, 52.0f }, def->halfLength * 0.85f, "TIP  /  HOOK",    "Glancing Cut", (Color){ 195, 34,  42,  255 } },
+            };
+
+            for (int p = 0; p < 3; p++) {
+                bool isSel   = (fabsf(g_game.chosenStrikePoint.x - presets[p].strikeX) < 0.15f);
+                bool isHov   = CheckCollisionPointRec(mouse, presets[p].r);
+                Color border = presets[p].col;
+                Color bg     = isSel ? border : (isHov ? (Color){ border.r, border.g, border.b, 180 } : (Color){ 250, 246, 236, 255 });
+                Color tx     = (isSel || isHov) ? WHITE : border;
+                Color sub    = (isSel || isHov) ? (Color){ 255, 255, 255, 200 } : (Color){ 85, 90, 100, 200 };
+
+                DrawRectangleRounded(presets[p].r, 0.14f, 4, bg);
+                DrawRectangleRoundedLines(presets[p].r, 0.14f, 4, border);
+
+                float lw = MeasureSchoolTextTitle(presets[p].label, 14);
+                DrawSchoolTextTitle(presets[p].label, presets[p].r.x + presets[p].r.width * 0.5f - lw * 0.5f, presets[p].r.y + 7, 14, tx);
+                float sw = MeasureSchoolText(presets[p].sub, 12);
+                DrawSchoolText(presets[p].sub, presets[p].r.x + presets[p].r.width * 0.5f - sw * 0.5f, presets[p].r.y + 30, 12, sub);
+            }
+
+            // Hint text beneath the buttons
+            const char* hint = "Slide finger on pen to aim  |  Tap empty desk or use buttons above, then release to flick";
+            float hw = MeasureSchoolText(hint, 12);
+            DrawSchoolText(hint, SCREEN_WIDTH * 0.5f - hw * 0.5f, 776.0f, 12, (Color){ 140, 150, 145, 195 });
         }
     }
 
@@ -2864,6 +2962,11 @@ EMSCRIPTEN_EXPORT void ApplyRemoteSync(int playerIndex, float posX, float posY, 
 
 EMSCRIPTEN_EXPORT void SetMatchMode(int matchType) {
     g_game.matchType = (MatchType)(matchType % 3);
+}
+
+EMSCRIPTEN_EXPORT void SetGameMode(int mode) {
+    g_game.currentGameMode = (GameMode)(mode % 3);
+    ResetMatchScoresAndBiros();
 }
 
 EMSCRIPTEN_EXPORT void SetAIDifficulty(int diff) {
