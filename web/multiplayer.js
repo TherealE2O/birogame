@@ -52,16 +52,16 @@
     // Helper to pass JS string to Emscripten C char*
     function c_setRoomCode(code) {
         if (!window.Module || !Module._SetOnlineRoomCode) return;
-        if (typeof Module.allocateUTF8 === 'function') {
-            const ptr = Module.allocateUTF8(code);
-            Module._SetOnlineRoomCode(ptr);
-            if (Module._free) Module._free(ptr);
-        } else if (typeof Module.stringToUTF8 === 'function' && typeof Module._malloc === 'function') {
+        if (typeof Module.stringToUTF8 === 'function' && typeof Module._malloc === 'function') {
             const lengthBytes = (code.length * 4) + 1;
             const ptr = Module._malloc(lengthBytes);
             Module.stringToUTF8(code, ptr, lengthBytes);
             Module._SetOnlineRoomCode(ptr);
             Module._free(ptr);
+        } else if (typeof Module.allocateUTF8 === 'function') {
+            const ptr = Module.allocateUTF8(code);
+            Module._SetOnlineRoomCode(ptr);
+            if (Module._free) Module._free(ptr);
         }
     }
 

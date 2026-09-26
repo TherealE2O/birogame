@@ -93,8 +93,7 @@ def main():
         "ccall",
         "cwrap",
         "stringToUTF8",
-        "UTF8ToString",
-        "allocateUTF8"
+        "UTF8ToString"
     ]
     
     import json
@@ -121,6 +120,7 @@ def main():
         "-sUSE_GLFW=3",
         "-sALLOW_MEMORY_GROWTH=1",
         "-sSTACK_SIZE=1048576",
+        "-sWASM_OPT=0",
         f"-sEXPORTED_FUNCTIONS={exported_funcs_json}",
         f"-sEXPORTED_RUNTIME_METHODS={exported_runtime_json}",
         "-o", out_js
