@@ -437,6 +437,10 @@ html, body {
     background: #17221b;
     outline: none;
     cursor: default;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 /* Loading Overlay */

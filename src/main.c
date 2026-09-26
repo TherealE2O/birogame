@@ -479,9 +479,16 @@ typedef struct {
     bool autotestMode;
     bool startInMarket;
 
-    // Mobile touch aiming: did the current mouse/finger press BEGIN on the active pen?
-    // If yes, dragging slides the contact reticle; it does NOT start power charging.
-    bool touchStartedOnPen;
+    // ---- Swipe-to-flick control (mobile web touch) ----
+    // On PLATFORM_WEB / mobile, swipe mode is active.
+    // The player draws a line ACROSS the pen (or along rear for spear move);
+    // where it crosses = contact point, swipe direction = impulse direction, speed = power.
+    bool    hasSeenTouch;              // latches true if touch detected or enabled via SetTouchControlMode
+    bool    isSwiping;                 // true while finger is held down (tracking gesture)
+    Vector2 touchSwipeStart;           // screen position where the current swipe began
+    Vector2 touchSwipeCurrent;         // screen position where finger currently is
+    float   touchSwipeStartTime;       // GetTime() timestamp when swipe started
+    float   swipeMissFeedbackTimer;    // timer to display "Swipe across the pen!" feedback
 } GameContext;
 
 static GameContext g_game = {0};
@@ -1711,6 +1718,105 @@ static void CalculateAIBotStrike(int botIndex, b2Vec2* outStrikePoint, float* ou
     }
 }
 
+typedef struct {
+    bool isValid;
+    b2Vec2 localStrikePoint;
+    float angle;
+    float powerFrac;
+    const char* strikeType;
+} SwipeStrikeResult;
+
+// Mobile Web Swipe Calculation
+// Cross-checks swipe line against active biro to determine contact point, angle, and impulse power
+static SwipeStrikeResult CalculateSwipeStrike(const Biro* biro, Vector2 startScr, Vector2 endScr, float duration) {
+    SwipeStrikeResult res = {0};
+    float distPx = Vector2Distance(startScr, endScr);
+    if (distPx < 20.0f) {
+        res.isValid = false;
+        return res;
+    }
+
+    b2Vec2 startWorld = WorldFromScreen(startScr);
+    b2Vec2 endWorld   = WorldFromScreen(endScr);
+    b2Vec2 startLocal = b2Body_GetLocalPoint(biro->bodyId, startWorld);
+    b2Vec2 endLocal   = b2Body_GetLocalPoint(biro->bodyId, endWorld);
+
+    const PenModelDef* def = &g_penModels[biro->modelId];
+    float halfL = def->halfLength;
+
+    // Power calculation from swipe speed and distance:
+    float speed = distPx / fmaxf(duration, 0.035f);
+    float speedNorm = (speed - 180.0f) / 1500.0f;
+    float distNorm  = (distPx - 25.0f) / 260.0f;
+    float power = Clamp(speedNorm * 0.70f + distNorm * 0.30f, 0.15f, 1.0f);
+
+    float dirWorldX = endWorld.x - startWorld.x;
+    float dirWorldY = endWorld.y - startWorld.y;
+    float angle = atan2f(dirWorldY, dirWorldX);
+
+    // Direction in local pen coordinates:
+    float dirLocalX = endLocal.x - startLocal.x;
+
+    bool hit = false;
+    float strikeX = 0.0f;
+    const char* sType = "FLICK";
+
+    // 1. Spear strike: swipe starting near or behind the tail (-halfL) and moving forward along pen (+X)
+    if (startLocal.x <= -halfL + 0.40f && fabsf(startLocal.y) <= 0.38f && dirLocalX > 0.12f) {
+        hit = true;
+        strikeX = -halfL * 0.88f;
+        sType = "SPEAR FLICK!";
+    }
+    // 2. Direct line crossing through y = 0
+    else if ((startLocal.y <= 0.0f && endLocal.y >= 0.0f) || (startLocal.y >= 0.0f && endLocal.y <= 0.0f)) {
+        float dy = endLocal.y - startLocal.y;
+        float t = (fabsf(dy) > 0.0001f) ? (-startLocal.y / dy) : 0.5f;
+        t = Clamp(t, 0.0f, 1.0f);
+        float xCross = startLocal.x + t * dirLocalX;
+        if (xCross >= -halfL - 0.28f && xCross <= halfL + 0.28f) {
+            hit = true;
+            strikeX = Clamp(xCross, -halfL * 0.88f, halfL * 0.88f);
+            if (strikeX < -halfL * 0.45f) sType = "TAIL SPIN!";
+            else if (strikeX > halfL * 0.45f) sType = "TIP HOOK!";
+            else sType = "CENTER PUSH!";
+        }
+    }
+    // 3. Swipe started on or very near the pen body and sliced away
+    else if (startLocal.x >= -halfL - 0.22f && startLocal.x <= halfL + 0.22f && fabsf(startLocal.y) <= 0.30f) {
+        hit = true;
+        strikeX = Clamp(startLocal.x, -halfL * 0.88f, halfL * 0.88f);
+        if (strikeX < -halfL * 0.45f) sType = "TAIL SPIN!";
+        else if (strikeX > halfL * 0.45f) sType = "TIP HOOK!";
+        else sType = "CENTER PUSH!";
+    }
+    // 4. Closest distance between swipe segment and pen spine segment [-halfL, halfL]
+    else {
+        float pX = Clamp(startLocal.x, -halfL, halfL);
+        float dStart = hypotf(startLocal.x - pX, startLocal.y);
+        float pX2 = Clamp(endLocal.x, -halfL, halfL);
+        float dEnd = hypotf(endLocal.x - pX2, endLocal.y);
+        float minD = fminf(dStart, dEnd);
+        if (minD <= 0.28f) {
+            hit = true;
+            strikeX = (dStart < dEnd) ? pX : pX2;
+            if (strikeX < -halfL * 0.45f) sType = "TAIL SPIN!";
+            else if (strikeX > halfL * 0.45f) sType = "TIP HOOK!";
+            else sType = "CENTER PUSH!";
+        }
+    }
+
+    if (hit) {
+        res.isValid = true;
+        res.localStrikePoint = (b2Vec2){ strikeX, 0.0f };
+        res.angle = angle;
+        res.powerFrac = power;
+        res.strikeType = sType;
+    } else {
+        res.isValid = false;
+    }
+    return res;
+}
+
 // Common Strike Execution function (Human, AI Bot, and Remote Network)
 static void ExecuteFlickStrike(int playerIndex, b2Vec2 strikeLocalPoint, float angle, float powerFrac) {
     if (playerIndex < 0 || playerIndex >= 4) return;
@@ -2272,114 +2378,114 @@ static void UpdateDrawFrame(void) {
             else if (g_game.matchType == MATCH_ONLINE_P2P) isLocalTurn = (g_game.activePlayer == g_game.onlineLocalPlayerIndex);
 
             if (isLocalTurn) {
-                // ---- Contact Point PRESET BUTTONS (visible before charging) ----
-                // These large thumb-friendly buttons snap the strike reticle and are
-                // checked first so they never accidentally start power-charging.
-                if (!g_game.isCharging && !clickHandled) {
-                    const PenModelDef* presDef = &g_penModels[currentBiro->modelId];
-                    Rectangle btnTail   = { (float)(SCREEN_WIDTH/2 - 345), 718.0f, 210.0f, 52.0f };
-                    Rectangle btnCenter = { (float)(SCREEN_WIDTH/2 - 107), 718.0f, 210.0f, 52.0f };
-                    Rectangle btnTip    = { (float)(SCREEN_WIDTH/2 + 131), 718.0f, 210.0f, 52.0f };
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                        if (CheckCollisionPointRec(mouse, btnTail)) {
-                            g_game.chosenStrikePoint = (b2Vec2){ -presDef->halfLength * 0.85f, 0.0f };
-                            clickHandled = true;
-                            if (g_audio.audioReady) PlaySound(g_audio.sndTick);
-                        } else if (CheckCollisionPointRec(mouse, btnCenter)) {
-                            g_game.chosenStrikePoint = (b2Vec2){ 0.0f, 0.0f };
-                            clickHandled = true;
-                            if (g_audio.audioReady) PlaySound(g_audio.sndTick);
-                        } else if (CheckCollisionPointRec(mouse, btnTip)) {
-                            g_game.chosenStrikePoint = (b2Vec2){ presDef->halfLength * 0.85f, 0.0f };
-                            clickHandled = true;
-                            if (g_audio.audioReady) PlaySound(g_audio.sndTick);
+                // Auto-detect touch if screen was touched
+                if (GetTouchPointCount() > 0) {
+                    g_game.hasSeenTouch = true;
+                }
+
+                if (g_game.swipeMissFeedbackTimer > 0.0f) {
+                    g_game.swipeMissFeedbackTimer -= dt;
+                }
+
+                if (g_game.hasSeenTouch) {
+                    // ========================================================
+                    // MOBILE SWIPE CONTROL (Swipe line across biro or rear spear)
+                    // ========================================================
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !clickHandled) {
+                        g_game.isSwiping = true;
+                        g_game.touchSwipeStart = mouse;
+                        g_game.touchSwipeCurrent = mouse;
+                        g_game.touchSwipeStartTime = (float)GetTime();
+                    }
+
+                    if (g_game.isSwiping) {
+                        g_game.touchSwipeCurrent = mouse;
+                    }
+
+                    if (g_game.isSwiping && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+                        g_game.isSwiping = false;
+                        float swipeDur = (float)GetTime() - g_game.touchSwipeStartTime;
+                        SwipeStrikeResult res = CalculateSwipeStrike(currentBiro, g_game.touchSwipeStart, mouse, swipeDur);
+                        if (res.isValid) {
+                            g_game.chosenStrikePoint = res.localStrikePoint;
+                            g_game.lockedArrowAngle = res.angle;
+                            ExecuteFlickStrike(g_game.activePlayer, res.localStrikePoint, res.angle, res.powerFrac);
+                        } else {
+                            if (Vector2Distance(g_game.touchSwipeStart, mouse) >= 22.0f) {
+                                g_game.swipeMissFeedbackTimer = 1.8f;
+                            }
                         }
                     }
-                }
 
-                // ---- Cancel button during charging (mobile: no right-click) ----
-                if (g_game.isCharging && !clickHandled) {
-                    Rectangle cancelBtnLogic = { (float)(SCREEN_WIDTH/2 + 183), 720.0f, 96.0f, 34.0f };
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse, cancelBtnLogic)) {
-                        g_game.isCharging = false;
-                        g_game.touchStartedOnPen = false;
-                        clickHandled = true;
-                        if (g_audio.audioReady) PlaySound(g_audio.sndTick);
+                    // Autotest fallback for CI test
+                    if (g_game.autotestMode && g_game.frameCount == 8 && !g_game.startInMarket) {
+                        b2Vec2 strikePt = (b2Vec2){ -0.85f, 0.0f };
+                        ExecuteFlickStrike(g_game.activePlayer, strikePt, 0.15f, 0.85f);
                     }
-                }
+                } else {
+                    // ========================================================
+                    // DESKTOP MOUSE CONTROL (Classic Rotating Arrow + Ruler Charge)
+                    // ========================================================
+                    if (!g_game.isCharging) {
+                        g_game.arrowAngle += 3.6f * dt;
+                        if (g_game.arrowAngle > 2.0f * PI) g_game.arrowAngle -= 2.0f * PI;
 
-                if (!g_game.isCharging) {
-                    g_game.arrowAngle += 3.6f * dt;
-                    if (g_game.arrowAngle > 2.0f * PI) g_game.arrowAngle -= 2.0f * PI;
-
-                    // Expanded to 0.40 m (~45 px) so thumbs can grab the pen reliably
-                    bool mouseOverPen = IsPointInBiro(currentBiro, mouseWorld, 0.40f);
-
-                    // On the first frame of a press, remember whether it started on the pen.
-                    // If yes → dragging slides the contact reticle; the charge does NOT begin.
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !clickHandled) {
-                        g_game.touchStartedOnPen = mouseOverPen;
+                        bool mouseOverPen = IsPointInBiro(currentBiro, mouseWorld, 0.20f);
+                        if (mouseOverPen) {
+                            b2Vec2 local = b2Body_GetLocalPoint(currentBiro->bodyId, mouseWorld);
+                            const PenModelDef* def = &g_penModels[currentBiro->modelId];
+                            local.x = Clamp(local.x, -def->halfLength + 0.05f, def->halfLength - 0.05f);
+                            local.y = 0.0f;
+                            g_game.chosenStrikePoint = local;
+                        }
                     }
 
-                    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && g_game.touchStartedOnPen && !clickHandled) {
-                        // Finger sliding along the pen barrel – update contact point
-                        b2Vec2 local = b2Body_GetLocalPoint(currentBiro->bodyId, mouseWorld);
-                        const PenModelDef* def = &g_penModels[currentBiro->modelId];
-                        local.x = Clamp(local.x, -def->halfLength + 0.05f, def->halfLength - 0.05f);
-                        local.y = 0.0f;
-                        g_game.chosenStrikePoint = local;
-                    } else if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT) && mouseOverPen) {
-                        // Desktop hover (mouse not held) still works as before
-                        b2Vec2 local = b2Body_GetLocalPoint(currentBiro->bodyId, mouseWorld);
-                        const PenModelDef* def = &g_penModels[currentBiro->modelId];
-                        local.x = Clamp(local.x, -def->halfLength + 0.05f, def->halfLength - 0.05f);
-                        local.y = 0.0f;
-                        g_game.chosenStrikePoint = local;
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !g_game.isCharging && !clickHandled) {
+                        g_game.isCharging = true;
+                        g_game.chargeTimer = 0.0f;
+                        g_game.lockedArrowAngle = g_game.arrowAngle;
+                    } else if (g_game.autotestMode && g_game.frameCount >= 5 && !g_game.isCharging && !g_game.startInMarket) {
+                        g_game.isCharging = true;
+                        g_game.chosenStrikePoint = (b2Vec2){ -0.85f, 0.0f };
+                        g_game.lockedArrowAngle = 0.15f;
+                        g_game.chargeTimer = 1.30f;
                     }
-                }
 
-                // Start charging ONLY if the press did NOT start on the pen
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !g_game.isCharging && !clickHandled && !g_game.touchStartedOnPen) {
-                    g_game.isCharging = true;
-                    g_game.chargeTimer = 0.0f;
-                    g_game.lockedArrowAngle = g_game.arrowAngle;
-                } else if (g_game.autotestMode && g_game.frameCount >= 5 && !g_game.isCharging && !g_game.startInMarket) {
-                    g_game.isCharging = true;
-                    g_game.chosenStrikePoint = (b2Vec2){ -0.85f, 0.0f };
-                    g_game.lockedArrowAngle = 0.15f;
-                    g_game.chargeTimer = 1.30f;
-                }
+                    if (g_game.isCharging) {
+                        if (!g_game.autotestMode) g_game.chargeTimer += dt * 3.2f;
+                        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) g_game.isCharging = false;
+                    }
 
-                if (g_game.isCharging) {
-                    if (!g_game.autotestMode) g_game.chargeTimer += dt * 3.2f;
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) g_game.isCharging = false;
-                }
+                    bool shouldRelease = false;
+                    if (g_game.isCharging && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+                        shouldRelease = true;
+                    } else if (g_game.autotestMode && g_game.frameCount == 8 && !g_game.startInMarket) {
+                        shouldRelease = true;
+                    }
 
-                bool shouldRelease = false;
-                if (g_game.isCharging && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-                    shouldRelease = true;
-                } else if (g_game.autotestMode && g_game.frameCount == 8 && !g_game.startInMarket) {
-                    shouldRelease = true;
+                    if (shouldRelease) {
+                        float rawPower = sinf(g_game.chargeTimer) * 0.5f + 0.5f;
+                        float powerFrac = Clamp(rawPower, 0.15f, 1.0f);
+                        ExecuteFlickStrike(g_game.activePlayer, g_game.chosenStrikePoint, g_game.lockedArrowAngle, powerFrac);
+                    }
                 }
 
                 if (g_game.turnTimer <= 0.0f) {
-                    if (g_game.isCharging) shouldRelease = true;
-                    else {
+                    if (g_game.isCharging) {
+                        float rawPower = sinf(g_game.chargeTimer) * 0.5f + 0.5f;
+                        float powerFrac = Clamp(rawPower, 0.15f, 1.0f);
+                        ExecuteFlickStrike(g_game.activePlayer, g_game.chosenStrikePoint, g_game.lockedArrowAngle, powerFrac);
+                    } else {
                         if (g_audio.audioReady) PlaySound(g_audio.sndBuzzer);
                         g_game.activePlayer = GetNextActivePlayer(g_game.activePlayer, g_game.biros, numP);
                         g_game.turnTimer = TURN_TIME_LIMIT;
                         g_game.isCharging = false;
+                        g_game.isSwiping = false;
                         g_game.lastTickSecond = -1;
                         g_game.aiState = AI_STATE_DECIDE;
                         g_game.aiActionTimer = 0.0f;
                         break;
                     }
-                }
-
-                if (shouldRelease) {
-                    float rawPower = sinf(g_game.chargeTimer) * 0.5f + 0.5f;
-                    float powerFrac = Clamp(rawPower, 0.15f, 1.0f);
-                    ExecuteFlickStrike(g_game.activePlayer, g_game.chosenStrikePoint, g_game.lockedArrowAngle, powerFrac);
                 }
             } else {
                 if (g_game.turnTimer <= 0.0f) {
@@ -2698,134 +2804,189 @@ static void UpdateDrawFrame(void) {
         DrawBiroPen(&g_game.biros[i], g_game.showDebugColliders, 1.0f);
     }
 
-    // 4. "Zero Football" Style Rotating Arrow & Power Charge
+    // 4. Aiming & Strike Controls Visualization (Mobile Swipe vs Desktop Mouse)
     if (g_game.state == STATE_AIMING && !currentBiro->isEliminated) {
-        b2Pos hitPtWorld = b2Body_GetWorldPoint(currentBiro->bodyId, g_game.chosenStrikePoint);
-        Vector2 hitScr = ScreenFromWorld(hitPtWorld);
+        if (g_game.hasSeenTouch) {
+            // ================================================================
+            // MOBILE SWIPE RENDERING
+            // ================================================================
+            if (g_game.isSwiping) {
+                float dur = fmaxf((float)GetTime() - g_game.touchSwipeStartTime, 0.02f);
+                SwipeStrikeResult preview = CalculateSwipeStrike(currentBiro, g_game.touchSwipeStart, g_game.touchSwipeCurrent, dur);
 
-        float currentAngle = g_game.isCharging ? g_game.lockedArrowAngle : g_game.arrowAngle;
-        Vector2 arrowDir = { cosf(currentAngle), sinf(currentAngle) };
+                float distPx = Vector2Distance(g_game.touchSwipeStart, g_game.touchSwipeCurrent);
+                Vector2 sStart = g_game.touchSwipeStart;
+                Vector2 sEnd   = g_game.touchSwipeCurrent;
 
-        DrawCircleV(hitScr, 6.0f, (Color){ 22, 60, 160, 255 });
-        DrawCircleLines((int)hitScr.x, (int)hitScr.y, 9.0f, (Color){ 255, 235, 175, 220 });
+                if (distPx > 8.0f) {
+                    float sAng = atan2f(sEnd.y - sStart.y, sEnd.x - sStart.x);
+                    Vector2 sDir = { cosf(sAng), sinf(sAng) };
 
-        DrawCircleLines((int)hitScr.x, (int)hitScr.y, 45.0f, (Color){ 255, 235, 175, 45 });
-        DrawCircleLines((int)hitScr.x, (int)hitScr.y, 70.0f, (Color){ 255, 235, 175, 30 });
+                    Color swipeCol = (Color){ 180, 210, 240, 160 };
+                    if (preview.isValid) {
+                        swipeCol = (preview.powerFrac < 0.5f) ?
+                            ColorLerp((Color){ 30, 180, 90, 255 }, (Color){ 245, 180, 40, 255 }, preview.powerFrac * 2.0f) :
+                            ColorLerp((Color){ 245, 180, 40, 255 }, (Color){ 230, 45, 45, 255 }, (preview.powerFrac - 0.5f) * 2.0f);
+                    }
 
-        if (!g_game.isCharging) {
-            float arrowLen = 65.0f;
-            Vector2 arrowTip = { hitScr.x + arrowDir.x * arrowLen, hitScr.y + arrowDir.y * arrowLen };
+                    // Draw swipe line
+                    DrawLineEx(sStart, sEnd, preview.isValid ? 5.5f : 3.5f, swipeCol);
+                    DrawCircleV(sStart, 6.0f, swipeCol);
 
-            DrawLineEx(hitScr, arrowTip, 4.0f, (Color){ 255, 215, 60, 230 });
+                    // Arrowhead at finger tip
+                    Vector2 tipHead1 = { sEnd.x - sDir.x * 15.0f + sDir.y * 9.0f, sEnd.y - sDir.y * 15.0f - sDir.x * 9.0f };
+                    Vector2 tipHead2 = { sEnd.x - sDir.x * 15.0f - sDir.y * 9.0f, sEnd.y - sDir.y * 15.0f + sDir.x * 9.0f };
+                    DrawTriangle(sEnd, tipHead1, tipHead2, swipeCol);
 
-            Vector2 headP1 = {
-                arrowTip.x - arrowDir.x * 14.0f + arrowDir.y * 8.0f,
-                arrowTip.y - arrowDir.y * 14.0f - arrowDir.x * 8.0f
-            };
-            Vector2 headP2 = {
-                arrowTip.x - arrowDir.x * 14.0f - arrowDir.y * 8.0f,
-                arrowTip.y - arrowDir.y * 14.0f + arrowDir.x * 8.0f
-            };
-            DrawTriangle(arrowTip, headP1, headP2, (Color){ 255, 215, 60, 255 });
-            DrawCircleLines((int)hitScr.x, (int)hitScr.y, arrowLen, (Color){ 255, 255, 255, 45 });
+                    if (preview.isValid) {
+                        // Highlight contact point on the biro
+                        b2Pos contactWorld = b2Body_GetWorldPoint(currentBiro->bodyId, preview.localStrikePoint);
+                        Vector2 contactScr = ScreenFromWorld(contactWorld);
+                        DrawCircleV(contactScr, 8.0f, (Color){ 255, 230, 70, 255 });
+                        DrawCircleLines((int)contactScr.x, (int)contactScr.y, 14.0f, WHITE);
+                        DrawCircleLines((int)contactScr.x, (int)contactScr.y, 22.0f, swipeCol);
+
+                        // Impulse projection vector from contact point
+                        float impLen = 50.0f + preview.powerFrac * 80.0f;
+                        Vector2 impTip = { contactScr.x + cosf(preview.angle) * impLen, contactScr.y + sinf(preview.angle) * impLen };
+                        DrawLineEx(contactScr, impTip, 4.0f, swipeCol);
+                        Vector2 iDir = { cosf(preview.angle), sinf(preview.angle) };
+                        Vector2 iHead1 = { impTip.x - iDir.x * 12.0f + iDir.y * 7.0f, impTip.y - iDir.y * 12.0f - iDir.x * 7.0f };
+                        Vector2 iHead2 = { impTip.x - iDir.x * 12.0f - iDir.y * 7.0f, impTip.y - iDir.y * 12.0f + iDir.x * 7.0f };
+                        DrawTriangle(impTip, iHead1, iHead2, swipeCol);
+
+                        // Floating power badge near finger
+                        const char* badgeTxt = TextFormat("%s  [%d%% POWER]", preview.strikeType, (int)(preview.powerFrac * 100.0f));
+                        float bw = MeasureSchoolTextTitle(badgeTxt, 14);
+                        Rectangle bRec = { sEnd.x - bw * 0.5f - 8, sEnd.y - 36, bw + 16, 24 };
+                        DrawRectangleRounded(bRec, 0.25f, 4, (Color){ 16, 22, 18, 235 });
+                        DrawRectangleRoundedLines(bRec, 0.25f, 4, swipeCol);
+                        DrawSchoolTextTitle(badgeTxt, bRec.x + 8, bRec.y + 4, 14, swipeCol);
+                    } else {
+                        // Gentle hint indicating cut is needed
+                        const char* sliceTxt = "Cross through the biro...";
+                        float sw = MeasureSchoolText(sliceTxt, 13);
+                        DrawSchoolText(sliceTxt, sEnd.x - sw * 0.5f, sEnd.y - 25, 13, (Color){ 200, 220, 240, 180 });
+                    }
+                }
+            } else {
+                // Persistent on-desk hint banner for touch users
+                Rectangle hintBanner = { SCREEN_WIDTH * 0.5f - 270, 716, 540, 44 };
+                DrawRectangleRounded(hintBanner, 0.18f, 4, (Color){ 20, 26, 22, 220 });
+                DrawRectangleRoundedLines(hintBanner, 0.18f, 4, (Color){ 215, 175, 60, 230 });
+                const char* tHint = "SWIPE ACROSS BIRO TO FLICK!";
+                float thw = MeasureSchoolTextTitle(tHint, 15);
+                DrawSchoolTextTitle(tHint, hintBanner.x + hintBanner.width * 0.5f - thw * 0.5f, hintBanner.y + 6, 15, (Color){ 255, 230, 140, 255 });
+                const char* tSub = "Fast swipe = Momentum  |  Swipe along rear = Spear Flick";
+                float tsw = MeasureSchoolText(tSub, 13);
+                DrawSchoolText(tSub, hintBanner.x + hintBanner.width * 0.5f - tsw * 0.5f, hintBanner.y + 24, 13, (Color){ 190, 210, 200, 230 });
+
+                if (g_game.swipeMissFeedbackTimer > 0.0f) {
+                    Rectangle warnBox = { SCREEN_WIDTH * 0.5f - 230, 665, 460, 34 };
+                    DrawRectangleRounded(warnBox, 0.20f, 4, (Color){ 45, 15, 18, 235 });
+                    DrawRectangleRoundedLines(warnBox, 0.20f, 4, (Color){ 220, 50, 60, 255 });
+                    const char* warnTxt = "MISSED PEN! Swipe to cross the biro barrel or rear.";
+                    float ww = MeasureSchoolTextTitle(warnTxt, 13);
+                    DrawSchoolTextTitle(warnTxt, warnBox.x + warnBox.width * 0.5f - ww * 0.5f, warnBox.y + 8, 13, (Color){ 255, 190, 190, 255 });
+                }
+            }
         } else {
-            float rawPower = sinf(g_game.chargeTimer) * 0.5f + 0.5f;
-            float powerFrac = Clamp(rawPower, 0.15f, 1.0f);
+            // ================================================================
+            // DESKTOP MOUSE RENDERING (Rotating Arrow + 15cm Ruler)
+            // ================================================================
+            b2Pos hitPtWorld = b2Body_GetWorldPoint(currentBiro->bodyId, g_game.chosenStrikePoint);
+            Vector2 hitScr = ScreenFromWorld(hitPtWorld);
 
-            float minLen = 50.0f;
-            float maxLen = 140.0f;
-            float arrowLen = minLen + powerFrac * (maxLen - minLen);
+            float currentAngle = g_game.isCharging ? g_game.lockedArrowAngle : g_game.arrowAngle;
+            Vector2 arrowDir = { cosf(currentAngle), sinf(currentAngle) };
 
-            Vector2 arrowTip = { hitScr.x + arrowDir.x * arrowLen, hitScr.y + arrowDir.y * arrowLen };
+            DrawCircleV(hitScr, 6.0f, (Color){ 22, 60, 160, 255 });
+            DrawCircleLines((int)hitScr.x, (int)hitScr.y, 9.0f, (Color){ 255, 235, 175, 220 });
 
-            Color powerCol = (powerFrac < 0.5f) ?
-                ColorLerp((Color){ 30, 160, 80, 255 }, (Color){ 245, 180, 40, 255 }, powerFrac * 2.0f) :
-                ColorLerp((Color){ 245, 180, 40, 255 }, (Color){ 225, 40, 40, 255 }, (powerFrac - 0.5f) * 2.0f);
+            DrawCircleLines((int)hitScr.x, (int)hitScr.y, 45.0f, (Color){ 255, 235, 175, 45 });
+            DrawCircleLines((int)hitScr.x, (int)hitScr.y, 70.0f, (Color){ 255, 235, 175, 30 });
 
-            DrawLineEx(hitScr, arrowTip, 5.5f, powerCol);
+            if (!g_game.isCharging) {
+                float arrowLen = 65.0f;
+                Vector2 arrowTip = { hitScr.x + arrowDir.x * arrowLen, hitScr.y + arrowDir.y * arrowLen };
 
-            Vector2 headP1 = {
-                arrowTip.x - arrowDir.x * 16.0f + arrowDir.y * 10.0f,
-                arrowTip.y - arrowDir.y * 16.0f - arrowDir.x * 10.0f
-            };
-            Vector2 headP2 = {
-                arrowTip.x - arrowDir.x * 16.0f - arrowDir.y * 10.0f,
-                arrowTip.y - arrowDir.y * 16.0f + arrowDir.x * 10.0f
-            };
-            DrawTriangle(arrowTip, headP1, headP2, powerCol);
+                DrawLineEx(hitScr, arrowTip, 4.0f, (Color){ 255, 215, 60, 230 });
 
-            // 15 cm Wooden School Ruler Power Bar
-            int pBarW = 340;
-            int pBarH = 26;
-            int pBarX = SCREEN_WIDTH / 2 - pBarW / 2;
-            int pBarY = 724;
+                Vector2 headP1 = {
+                    arrowTip.x - arrowDir.x * 14.0f + arrowDir.y * 8.0f,
+                    arrowTip.y - arrowDir.y * 14.0f - arrowDir.x * 8.0f
+                };
+                Vector2 headP2 = {
+                    arrowTip.x - arrowDir.x * 14.0f - arrowDir.y * 8.0f,
+                    arrowTip.y - arrowDir.y * 14.0f + arrowDir.x * 8.0f
+                };
+                DrawTriangle(arrowTip, headP1, headP2, (Color){ 255, 215, 60, 255 });
+                DrawCircleLines((int)hitScr.x, (int)hitScr.y, arrowLen, (Color){ 255, 255, 255, 45 });
+            } else {
+                float rawPower = sinf(g_game.chargeTimer) * 0.5f + 0.5f;
+                float powerFrac = Clamp(rawPower, 0.15f, 1.0f);
 
-            Rectangle rulerRec = { pBarX, pBarY, pBarW, pBarH };
-            DrawRectangleRounded(rulerRec, 0.15f, 4, (Color){ 236, 212, 160, 255 });
-            DrawRectangleRoundedLines(rulerRec, 0.15f, 4, (Color){ 150, 110, 60, 255 });
-            DrawLine(pBarX + 4, pBarY + 3, pBarX + pBarW - 4, pBarY + 3, (Color){ 255, 240, 205, 180 });
+                float minLen = 50.0f;
+                float maxLen = 140.0f;
+                float arrowLen = minLen + powerFrac * (maxLen - minLen);
 
-            for (int cm = 0; cm <= 15; cm++) {
-                int tx = pBarX + 15 + cm * 20;
-                DrawLine(tx, pBarY + 2, tx, pBarY + 10, (Color){ 90, 55, 25, 230 });
-                if (cm % 3 == 0) {
-                    DrawSchoolText(TextFormat("%d", cm), tx - 4, pBarY + 10, 11, (Color){ 85, 50, 20, 220 });
+                Vector2 arrowTip = { hitScr.x + arrowDir.x * arrowLen, hitScr.y + arrowDir.y * arrowLen };
+
+                Color powerCol = (powerFrac < 0.5f) ?
+                    ColorLerp((Color){ 30, 160, 80, 255 }, (Color){ 245, 180, 40, 255 }, powerFrac * 2.0f) :
+                    ColorLerp((Color){ 245, 180, 40, 255 }, (Color){ 225, 40, 40, 255 }, (powerFrac - 0.5f) * 2.0f);
+
+                DrawLineEx(hitScr, arrowTip, 5.5f, powerCol);
+
+                Vector2 headP1 = {
+                    arrowTip.x - arrowDir.x * 16.0f + arrowDir.y * 10.0f,
+                    arrowTip.y - arrowDir.y * 16.0f - arrowDir.x * 10.0f
+                };
+                Vector2 headP2 = {
+                    arrowTip.x - arrowDir.x * 16.0f - arrowDir.y * 10.0f,
+                    arrowTip.y - arrowDir.y * 16.0f + arrowDir.x * 10.0f
+                };
+                DrawTriangle(arrowTip, headP1, headP2, powerCol);
+
+                // 15 cm Wooden School Ruler Power Bar
+                int pBarW = 340;
+                int pBarH = 26;
+                int pBarX = SCREEN_WIDTH / 2 - pBarW / 2;
+                int pBarY = 724;
+
+                Rectangle rulerRec = { pBarX, pBarY, pBarW, pBarH };
+                DrawRectangleRounded(rulerRec, 0.15f, 4, (Color){ 236, 212, 160, 255 });
+                DrawRectangleRoundedLines(rulerRec, 0.15f, 4, (Color){ 150, 110, 60, 255 });
+                DrawLine(pBarX + 4, pBarY + 3, pBarX + pBarW - 4, pBarY + 3, (Color){ 255, 240, 205, 180 });
+
+                for (int cm = 0; cm <= 15; cm++) {
+                    int tx = pBarX + 15 + cm * 20;
+                    DrawLine(tx, pBarY + 2, tx, pBarY + 10, (Color){ 90, 55, 25, 230 });
+                    if (cm % 3 == 0) {
+                        DrawSchoolText(TextFormat("%d", cm), tx - 4, pBarY + 10, 11, (Color){ 85, 50, 20, 220 });
+                    }
+                    if (cm < 15) {
+                        DrawLine(tx + 10, pBarY + 2, tx + 10, pBarY + 6, (Color){ 120, 80, 40, 180 });
+                    }
                 }
-                if (cm < 15) {
-                    DrawLine(tx + 10, pBarY + 2, tx + 10, pBarY + 6, (Color){ 120, 80, 40, 180 });
-                }
+
+                int fillW = (int)((pBarW - 30) * powerFrac);
+                Rectangle inkTrack = { pBarX + 15, pBarY + 17, pBarW - 30, 6 };
+                DrawRectangleRounded(inkTrack, 0.5f, 2, (Color){ 180, 150, 105, 160 });
+                Rectangle inkFill = { pBarX + 15, pBarY + 17, fillW, 6 };
+                DrawRectangleRounded(inkFill, 0.5f, 2, powerCol);
+
+                const char* pTxt = TextFormat("FLICK IMPULSE: %d%%  (RELEASE TO STRIKE!)", (int)(powerFrac * 100.0f));
+                float txtW = MeasureSchoolText(pTxt, 15);
+                DrawSchoolText(pTxt, SCREEN_WIDTH / 2 - txtW / 2, pBarY - 20, 15, (Color){ 255, 235, 175, 255 });
+
+                // [x CANCEL] button – right of the ruler bar
+                Rectangle cancelBtnR = { (float)(pBarX + pBarW + 12), (float)(pBarY - 4), 96.0f, (float)(pBarH + 8) };
+                bool hoverCancel = CheckCollisionPointRec(mouse, cancelBtnR);
+                DrawRectangleRounded(cancelBtnR, 0.18f, 4, hoverCancel ? (Color){ 195, 34, 42, 255 } : (Color){ 250, 240, 240, 255 });
+                DrawRectangleRoundedLines(cancelBtnR, 0.18f, 4, (Color){ 195, 34, 42, 255 });
+                DrawSchoolTextTitle("x CANCEL", cancelBtnR.x + 10, cancelBtnR.y + 7, 13, hoverCancel ? WHITE : (Color){ 195, 34, 42, 255 });
             }
-
-            int fillW = (int)((pBarW - 30) * powerFrac);
-            Rectangle inkTrack = { pBarX + 15, pBarY + 17, pBarW - 30, 6 };
-            DrawRectangleRounded(inkTrack, 0.5f, 2, (Color){ 180, 150, 105, 160 });
-            Rectangle inkFill = { pBarX + 15, pBarY + 17, fillW, 6 };
-            DrawRectangleRounded(inkFill, 0.5f, 2, powerCol);
-
-            const char* pTxt = TextFormat("FLICK IMPULSE: %d%%  (RELEASE TO STRIKE!)", (int)(powerFrac * 100.0f));
-            float txtW = MeasureSchoolText(pTxt, 15);
-            DrawSchoolText(pTxt, SCREEN_WIDTH / 2 - txtW / 2, pBarY - 20, 15, (Color){ 255, 235, 175, 255 });
-
-            // [x CANCEL] button – mobile-friendly, right of the ruler bar
-            Rectangle cancelBtnR = { (float)(pBarX + pBarW + 12), (float)(pBarY - 4), 96.0f, (float)(pBarH + 8) };
-            bool hoverCancel = CheckCollisionPointRec(mouse, cancelBtnR);
-            DrawRectangleRounded(cancelBtnR, 0.18f, 4, hoverCancel ? (Color){ 195, 34, 42, 255 } : (Color){ 250, 240, 240, 255 });
-            DrawRectangleRoundedLines(cancelBtnR, 0.18f, 4, (Color){ 195, 34, 42, 255 });
-            DrawSchoolTextTitle("x CANCEL", cancelBtnR.x + 10, cancelBtnR.y + 7, 13, hoverCancel ? WHITE : (Color){ 195, 34, 42, 255 });
-        }
-
-        // ---- Contact Point PRESET BUTTONS (drawn during aiming, before charging) ----
-        if (!g_game.isCharging && !currentBiro->isEliminated) {
-            const PenModelDef* def = &g_penModels[currentBiro->modelId];
-
-            typedef struct { Rectangle r; float strikeX; const char* label; const char* sub; Color col; } PresetBtn;
-            PresetBtn presets[3] = {
-                { { (float)(SCREEN_WIDTH/2 - 345), 718.0f, 210.0f, 52.0f }, -def->halfLength * 0.85f, "TAIL  /  SPIN",   "Max Torque", (Color){ 22,  60,  160, 255 } },
-                { { (float)(SCREEN_WIDTH/2 - 107), 718.0f, 210.0f, 52.0f }, 0.0f,                    "CENTER  /  PUSH", "Direct Thrust", (Color){ 25,  135, 65,  255 } },
-                { { (float)(SCREEN_WIDTH/2 + 131), 718.0f, 210.0f, 52.0f }, def->halfLength * 0.85f, "TIP  /  HOOK",    "Glancing Cut", (Color){ 195, 34,  42,  255 } },
-            };
-
-            for (int p = 0; p < 3; p++) {
-                bool isSel   = (fabsf(g_game.chosenStrikePoint.x - presets[p].strikeX) < 0.15f);
-                bool isHov   = CheckCollisionPointRec(mouse, presets[p].r);
-                Color border = presets[p].col;
-                Color bg     = isSel ? border : (isHov ? (Color){ border.r, border.g, border.b, 180 } : (Color){ 250, 246, 236, 255 });
-                Color tx     = (isSel || isHov) ? WHITE : border;
-                Color sub    = (isSel || isHov) ? (Color){ 255, 255, 255, 200 } : (Color){ 85, 90, 100, 200 };
-
-                DrawRectangleRounded(presets[p].r, 0.14f, 4, bg);
-                DrawRectangleRoundedLines(presets[p].r, 0.14f, 4, border);
-
-                float lw = MeasureSchoolTextTitle(presets[p].label, 14);
-                DrawSchoolTextTitle(presets[p].label, presets[p].r.x + presets[p].r.width * 0.5f - lw * 0.5f, presets[p].r.y + 7, 14, tx);
-                float sw = MeasureSchoolText(presets[p].sub, 12);
-                DrawSchoolText(presets[p].sub, presets[p].r.x + presets[p].r.width * 0.5f - sw * 0.5f, presets[p].r.y + 30, 12, sub);
-            }
-
-            // Hint text beneath the buttons
-            const char* hint = "Slide finger on pen to aim  |  Tap empty desk or use buttons above, then release to flick";
-            float hw = MeasureSchoolText(hint, 12);
-            DrawSchoolText(hint, SCREEN_WIDTH * 0.5f - hw * 0.5f, 776.0f, 12, (Color){ 140, 150, 145, 195 });
         }
     }
 
@@ -2988,6 +3149,10 @@ EMSCRIPTEN_EXPORT void SetOnlineRoomCode(const char* code) {
 
 EMSCRIPTEN_EXPORT void SetOnlineConnectionStatus(int connected) {
     g_game.isOnlineConnected = (bool)connected;
+}
+
+EMSCRIPTEN_EXPORT void SetTouchControlMode(int enable) {
+    g_game.hasSeenTouch = (bool)enable;
 }
 
 EMSCRIPTEN_EXPORT void RestartMatchFromNetwork(int mode, int stage, int table) {

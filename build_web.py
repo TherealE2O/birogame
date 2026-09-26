@@ -83,6 +83,7 @@ def main():
         "_SetOnlineRole",
         "_SetOnlineRoomCode",
         "_SetOnlineConnectionStatus",
+        "_SetTouchControlMode",
         "_RestartMatchFromNetwork",
         "_GetGameActivePlayer",
         "_GetGameMatchState",

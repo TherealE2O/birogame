@@ -97,6 +97,10 @@
             if (s.matchType === 2) {
                 Module._SetOnlineRole(net.isHost ? 1 : 0);
             }
+            const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+            if (Module._SetTouchControlMode) {
+                Module._SetTouchControlMode(isTouch ? 1 : 0);
+            }
         } catch (e) {
             console.warn('[MP] c_applyMenuSettings error', e);
         }
