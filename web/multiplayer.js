@@ -88,6 +88,16 @@
         }
     }
 
+    function isActualMobileDevice() {
+        const ua = navigator.userAgent || '';
+        const isMobileOS = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+        const isDesktopOS = /Windows NT|Macintosh|X11|Linux x86_64/i.test(ua);
+        if (isDesktopOS && !/Android/i.test(ua)) {
+            return false; // Windows PC, Mac, or Linux Desktop!
+        }
+        return isMobileOS;
+    }
+
     function c_applyMenuSettings(s) {
         if (!window.Module || !Module._SetMatchMode) return;
         try {
@@ -97,9 +107,14 @@
             if (s.matchType === 2) {
                 Module._SetOnlineRole(net.isHost ? 1 : 0);
             }
-            const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+            let touchMode = 0;
+            if (s && typeof s.controlMode !== 'undefined') {
+                touchMode = s.controlMode;
+            } else {
+                touchMode = isActualMobileDevice() ? 1 : 0;
+            }
             if (Module._SetTouchControlMode) {
-                Module._SetTouchControlMode(isTouch ? 1 : 0);
+                Module._SetTouchControlMode(touchMode);
             }
         } catch (e) {
             console.warn('[MP] c_applyMenuSettings error', e);

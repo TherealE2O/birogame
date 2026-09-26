@@ -125,6 +125,15 @@
             </div>
         </div>
 
+        <!-- SECTION 4: Controls Scheme (Desktop PC Mouse vs Mobile Touch Swipe) -->
+        <div class="menu-section">
+            <div class="menu-label">Control Method</div>
+            <div class="pill-row" id="ctrlRow">
+                <button class="pill pill-blue active" id="btnCtrlMouse" data-group="ctrl" data-val="0" onclick="selectPill(this)">🖱️ PC Mouse (Aim & Charge)</button>
+                <button class="pill pill-blue" id="btnCtrlTouch" data-group="ctrl" data-val="1" onclick="selectPill(this)">📱 Mobile (Swipe to Flick)</button>
+            </div>
+        </div>
+
         <div class="menu-divider"></div>
 
         <!-- START BUTTON -->
@@ -279,13 +288,25 @@
 /* ----------------------------------------------------------------
    Menu state
 ---------------------------------------------------------------- */
+var isMobileDevice = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && !/Windows NT|Macintosh|Linux x86_64/i.test(navigator.userAgent);
+
 var menuSel = {
-    mode:      0,   // 0=1v1  1=2v2  2=Royale
-    matchType: 0,   // 0=AI   1=Local  2=Online
-    aiDiff:    1,   // 0-3
-    onlineRole:'host',
-    joinCode:  ''
+    mode:        0,   // 0=1v1  1=2v2  2=Royale
+    matchType:   0,   // 0=AI   1=Local  2=Online
+    aiDiff:      1,   // 0-3
+    controlMode: isMobileDevice ? 1 : 0, // 0=PC Mouse, 1=Mobile Touch
+    onlineRole:  'host',
+    joinCode:    ''
 };
+
+if (isMobileDevice) {
+    var bM = document.getElementById('btnCtrlMouse');
+    var bT = document.getElementById('btnCtrlTouch');
+    if (bM && bT) {
+        bM.classList.remove('active');
+        bT.classList.add('active');
+    }
+}
 
 function selectPill(btn) {
     var group = btn.dataset.group;
@@ -297,9 +318,10 @@ function selectPill(btn) {
     });
     btn.classList.add('active');
 
-    if (group === 'mode')  { menuSel.mode      = val; }
-    if (group === 'match') { menuSel.matchType  = val; onMatchTypeChange(val); }
-    if (group === 'diff')  { menuSel.aiDiff     = val; }
+    if (group === 'mode')  { menuSel.mode        = val; }
+    if (group === 'match') { menuSel.matchType   = val; onMatchTypeChange(val); }
+    if (group === 'diff')  { menuSel.aiDiff      = val; }
+    if (group === 'ctrl')  { menuSel.controlMode = val; }
 }
 
 function onMatchTypeChange(val) {

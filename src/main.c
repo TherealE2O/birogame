@@ -479,11 +479,10 @@ typedef struct {
     bool autotestMode;
     bool startInMarket;
 
-    // ---- Swipe-to-flick control (mobile web touch) ----
-    // On PLATFORM_WEB / mobile, swipe mode is active.
-    // The player draws a line ACROSS the pen (or along rear for spear move);
-    // where it crosses = contact point, swipe direction = impulse direction, speed = power.
-    bool    hasSeenTouch;              // latches true if touch detected or enabled via SetTouchControlMode
+    // ---- Touch / Swipe control vs Desktop PC Mouse control ----
+    // false = Desktop PC Mouse (rotating arrow, ruler charge, release to strike)
+    // true  = Mobile Touch Swipe (swipe across biro, momentum power, spear move)
+    bool    isTouchMode;               // false by default (PC Mouse mode)
     bool    isSwiping;                 // true while finger is held down (tracking gesture)
     Vector2 touchSwipeStart;           // screen position where the current swipe began
     Vector2 touchSwipeCurrent;         // screen position where finger currently is
@@ -1470,8 +1469,22 @@ static void DrawHUD(void) {
         int h = (x % 50 == 0) ? 8 : 4;
         DrawLine(x, SCREEN_HEIGHT - 36, x, SCREEN_HEIGHT - 36 + h, (Color){ 130, 95, 60, 160 });
     }
-    DrawSchoolText("STRIKE: [HOVER ON PEN] + [HOLD CLICK TO CHARGE RULER] + [RELEASE TO FLICK]  |  [P]: Market  |  [O]: Match  |  [I]: AI Diff  |  [S]: Axis  |  [TAB]: Arena  |  [M]: Mode",
-                   18, SCREEN_HEIGHT - 25, 14, (Color){ 238, 225, 195, 230 });
+    if (g_game.isTouchMode) {
+        DrawSchoolText("MOBILE TOUCH: [SWIPE ACROSS THE BIRO TO FLICK]  |  Fast Swipe = Power  |  Rear Swipe = Spear Move",
+                       18, SCREEN_HEIGHT - 25, 14, (Color){ 238, 225, 195, 230 });
+    } else {
+        DrawSchoolText("PC MOUSE: [HOVER ON PEN] + [HOLD CLICK TO CHARGE RULER] + [RELEASE TO FLICK]  |  [P]: Market  |  [O]: Match  |  [TAB]: Arena",
+                       18, SCREEN_HEIGHT - 25, 14, (Color){ 238, 225, 195, 230 });
+    }
+
+    // Clickable toggle button in bottom right corner
+    Rectangle ctrlToggleRect = { SCREEN_WIDTH - 215, SCREEN_HEIGHT - 32, 205, 26 };
+    bool hovToggle = CheckCollisionPointRec(GetMousePosition(), ctrlToggleRect);
+    DrawRectangleRounded(ctrlToggleRect, 0.25f, 4, hovToggle ? (Color){ 55, 65, 58, 255 } : (Color){ 28, 22, 16, 255 });
+    DrawRectangleRoundedLines(ctrlToggleRect, 0.25f, 4, g_game.isTouchMode ? (Color){ 50, 190, 95, 255 } : (Color){ 230, 185, 60, 255 });
+    const char* ctrlTxt = g_game.isTouchMode ? "[ 📱 TOUCH SWIPE ]" : "[ 🖱️ PC MOUSE AIM ]";
+    float ctw = MeasureSchoolTextTitle(ctrlTxt, 13);
+    DrawSchoolTextTitle(ctrlTxt, ctrlToggleRect.x + ctrlToggleRect.width * 0.5f - ctw * 0.5f, ctrlToggleRect.y + 5, 13, g_game.isTouchMode ? (Color){ 130, 245, 160, 255 } : (Color){ 255, 235, 140, 255 });
 }
 
 // Live Physics Telemetry Box (Toggleable with [T])
@@ -2275,6 +2288,14 @@ static void UpdateDrawFrame(void) {
         }
     }
 
+    // Toggle Mobile Touch vs Desktop PC Mouse mode via bottom-right button
+    Rectangle ctrlToggleRect = { SCREEN_WIDTH - 215, SCREEN_HEIGHT - 32, 205, 26 };
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse, ctrlToggleRect)) {
+        g_game.isTouchMode = !g_game.isTouchMode;
+        if (g_audio.audioReady) PlaySound(g_audio.sndTick);
+        clickHandled = true;
+    }
+
     // Global Hotkeys
     if (IsKeyPressed(KEY_C)) g_game.showDebugColliders = !g_game.showDebugColliders;
     if (IsKeyPressed(KEY_T)) g_game.showTelemetry = !g_game.showTelemetry;
@@ -2378,16 +2399,11 @@ static void UpdateDrawFrame(void) {
             else if (g_game.matchType == MATCH_ONLINE_P2P) isLocalTurn = (g_game.activePlayer == g_game.onlineLocalPlayerIndex);
 
             if (isLocalTurn) {
-                // Auto-detect touch if screen was touched
-                if (GetTouchPointCount() > 0) {
-                    g_game.hasSeenTouch = true;
-                }
-
                 if (g_game.swipeMissFeedbackTimer > 0.0f) {
                     g_game.swipeMissFeedbackTimer -= dt;
                 }
 
-                if (g_game.hasSeenTouch) {
+                if (g_game.isTouchMode) {
                     // ========================================================
                     // MOBILE SWIPE CONTROL (Swipe line across biro or rear spear)
                     // ========================================================
@@ -2806,7 +2822,7 @@ static void UpdateDrawFrame(void) {
 
     // 4. Aiming & Strike Controls Visualization (Mobile Swipe vs Desktop Mouse)
     if (g_game.state == STATE_AIMING && !currentBiro->isEliminated) {
-        if (g_game.hasSeenTouch) {
+        if (g_game.isTouchMode) {
             // ================================================================
             // MOBILE SWIPE RENDERING
             // ================================================================
@@ -3152,7 +3168,7 @@ EMSCRIPTEN_EXPORT void SetOnlineConnectionStatus(int connected) {
 }
 
 EMSCRIPTEN_EXPORT void SetTouchControlMode(int enable) {
-    g_game.hasSeenTouch = (bool)enable;
+    g_game.isTouchMode = (bool)enable;
 }
 
 EMSCRIPTEN_EXPORT void RestartMatchFromNetwork(int mode, int stage, int table) {
