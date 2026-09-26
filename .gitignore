@@ -1,0 +1,19 @@
+# Binaries and object files
+*.exe
+*.pdb
+*.obj
+*.o
+
+# Preserve prebuilt raylib static libraries
+!extern/**/*.a
+
+# Local WebAssembly build outputs (built fresh by GitHub Actions)
+web_dist/
+_site/
+
+# Test screenshots
+test_*.png
+
+# VS Code / IDE
+.vscode/
+.idea/

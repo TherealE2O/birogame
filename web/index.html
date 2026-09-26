@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BIRO CLASH - School Desk Physics | Box2D v3 & Raylib WebAssembly</title>
+    
+    <!-- Meta tags for rich viral Twitter / Open Graph cards -->
+    <meta name="description" content="Authentic Nigerian school desk Biro pen flicking physics game! Powered by Box2D v3 & Raylib 6.0 WebAssembly. Play 100% free with 1-click P2P WebRTC multiplayer or solo vs AI bots!">
+    <meta property="og:title" content="BIRO CLASH - School Desk Physics">
+    <meta property="og:description" content="Flick your biro, trigger Box2D v3 impulse collisions, and knock your opponent off the school desk! 100% Free P2P multiplayer.">
+    <meta property="og:type" content="game">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="BIRO CLASH: School Desk Physics">
+    <meta name="twitter:description" content="Flick your biro, trigger Box2D v3 impulse collisions, and knock your opponent off the school desk! 100% Free P2P multiplayer.">
+
+    <!-- Fonts & Styling -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Kalam:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Free Public PeerJS library for zero-cost browser-to-browser WebRTC DataChannels -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+    <!-- Classroom Header -->
+    <header class="classroom-header">
+        <div class="brand-section">
+            <h1 class="brand-title">BIRO CLASH</h1>
+            <span class="brand-subtitle">School Desk Physics</span>
+        </div>
+
+        <div class="header-badges">
+            <span class="badge badge-box2d">Box2D v3.2.0 + Raylib 6.0</span>
+            <span class="badge badge-free">100% Free P2P WebRTC ($0.00)</span>
+            <button class="badge badge-github" onclick="window.copyRoomLink()">📋 Copy Room</button>
+            <button class="badge badge-github" onclick="window.tweetChallenge()">⚡ Tweet Link</button>
+        </div>
+    </header>
+
+    <!-- Game Canvas Viewport Frame -->
+    <main class="game-container">
+        <div class="canvas-frame">
+            <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+
+            <!-- Loading Paper Overlay -->
+            <div id="loadingOverlay" class="loading-overlay">
+                <div class="loading-paper">
+                    <div class="loading-pen-icon">🖊️</div>
+                    <div class="loading-title">OPENING SCHOOL DESK...</div>
+                    <div class="loading-subtitle">Compiling Box2D v3 & Raylib WebAssembly</div>
+                    <div class="progress-track">
+                        <div id="progressBar" class="progress-bar"></div>
+                    </div>
+                    <div id="loadingStatus" class="loading-status-text">Preparing physics world...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Quick Action & Shortcut Tray -->
+    <footer class="action-tray">
+        <div class="tray-shortcuts">
+            <span>Controls:</span>
+            <span><span class="kbd">CLICK</span> Aim/Power</span>
+            <span><span class="kbd">TAB</span> Arena</span>
+            <span><span class="kbd">M</span> Mode</span>
+            <span><span class="kbd">S</span> Axis</span>
+            <span><span class="kbd">O</span> Online</span>
+            <span><span class="kbd">I</span> AI Bot</span>
+            <span><span class="kbd">P</span> Market</span>
+            <span><span class="kbd">R</span> Reset</span>
+        </div>
+
+        <div class="tray-buttons">
+            <button class="btn-tray btn-copy" onclick="window.copyRoomLink()">
+                📋 Copy Invite Link
+            </button>
+            <button class="btn-tray btn-twitter" onclick="window.tweetChallenge()">
+                𝕏 Challenge on X
+            </button>
+            <button class="btn-tray btn-fullscreen" onclick="window.toggleGameFullscreen()">
+                ⛶ Fullscreen
+            </button>
+        </div>
+    </footer>
+
+    <!-- PeerJS WebRTC Multiplayer script -->
+    <script src="multiplayer.js"></script>
+
+    <!-- Emscripten Module Glue -->
+    <script>
+        var statusElement = document.getElementById('loadingStatus');
+        var progressBar = document.getElementById('progressBar');
+        var loadingOverlay = document.getElementById('loadingOverlay');
+
+        var Module = {
+            preRun: [],
+            postRun: [],
+            print: (function() {
+                return function(text) {
+                    if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+                    console.log(text);
+                };
+            })(),
+            printErr: function(text) {
+                if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+                console.error(text);
+            },
+            canvas: (function() {
+                var canvas = document.getElementById('canvas');
+                canvas.addEventListener("webglcontextlost", function(e) { 
+                    alert('WebGL context lost. Please reload the page.'); 
+                    e.preventDefault(); 
+                }, false);
+                return canvas;
+            })(),
+            setStatus: function(text) {
+                if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+                if (text === Module.setStatus.last.text) return;
+                var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+                var now = Date.now();
+                if (m && now - Module.setStatus.last.time < 30) return; // if this is a progress update, skip if too fast
+                Module.setStatus.last.time = now;
+                Module.setStatus.last.text = text;
+
+                if (m) {
+                    text = m[1];
+                    var progress = parseInt(m[2]) / parseInt(m[4]) * 100;
+                    if (progressBar) progressBar.style.width = progress + '%';
+                }
+                if (statusElement) statusElement.innerText = text;
+            },
+            totalDependencies: 0,
+            monitorRunDependencies: function(left) {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+                Module.setStatus(left ? 'Preparing desk stationery... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All assets ready.');
+            },
+            onRuntimeInitialized: function() {
+                console.log("[WASM] Box2D v3 & Raylib 6.0 runtime initialized successfully!");
+                if (loadingOverlay) {
+                    loadingOverlay.classList.add('hidden');
+                }
+                if (typeof window.onWasmInitialized === 'function') {
+                    window.onWasmInitialized();
+                }
+            }
+        };
+
+        Module.setStatus('Downloading physics engine...');
+        window.onerror = function(event) {
+            Module.setStatus('Exception thrown, see JavaScript console');
+            if (loadingOverlay) loadingOverlay.classList.remove('hidden');
+        };
+    </script>
+
+    <!-- Load the compiled WebAssembly JS bundle -->
+    <script async type="text/javascript" src="biro_game.js"></script>
+</body>
+</html>

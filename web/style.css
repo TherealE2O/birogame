@@ -1,0 +1,388 @@
+/* ==========================================================================
+   BIRO CLASH: School Desk Physics
+   Classroom Wood Desk & Blackboard Theme CSS
+   ========================================================================== */
+
+:root {
+    --bg-dark: #111713;
+    --chalk-green: #1a2820;
+    --wood-border: #4a331e;
+    --wood-trim: #73502c;
+    --paper-ivory: #faf6ec;
+    --paper-line: #b4cde7;
+    --ink-blue: #163ca0;
+    --ink-red: #c3222a;
+    --chalk-white: #f5f8f5;
+    --desk-gold: #ffcd2d;
+    --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.65);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-dark);
+    background-image: 
+        radial-gradient(circle at 50% 30%, #1e2e25 0%, #111713 85%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 32px 32px, 32px 32px;
+    font-family: 'Patrick Hand', 'Comic Sans MS', cursive, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--chalk-white);
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* Header bar */
+.classroom-header {
+    width: 100%;
+    max-width: 1320px;
+    padding: 12px 20px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.brand-section {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+}
+
+.brand-title {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--desk-gold);
+    text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.8), 0 0 12px rgba(255, 205, 45, 0.4);
+}
+
+.brand-subtitle {
+    font-size: 14px;
+    letter-spacing: 2px;
+    color: #a4b3a8;
+    text-transform: uppercase;
+}
+
+.header-badges {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+}
+
+.badge {
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.badge-box2d {
+    background: #1b382b;
+    border: 1px solid #336e4b;
+    color: #8ce4b0;
+}
+
+.badge-free {
+    background: #3d2116;
+    border: 1px solid #7a3e23;
+    color: #ff9d6c;
+}
+
+.badge-github {
+    background: #23272e;
+    border: 1px solid #444c56;
+    color: #e6edf3;
+    cursor: pointer;
+}
+
+.badge-github:hover {
+    background: #2d333b;
+    transform: translateY(-1px);
+}
+
+/* Main Canvas Wrapper */
+.game-container {
+    position: relative;
+    width: 100%;
+    max-width: 1286px;
+    padding: 0 10px 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.canvas-frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    max-height: 800px;
+    background: #2b1f14;
+    border-radius: 10px;
+    padding: 4px;
+    box-shadow: 
+        var(--shadow-soft),
+        inset 0 2px 4px rgba(255, 255, 255, 0.12),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.7);
+    border: 3px solid var(--wood-trim);
+}
+
+#canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 6px;
+    background-color: #17221b;
+    outline: none;
+    cursor: default;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    right: 4px;
+    bottom: 4px;
+    background: rgba(17, 23, 19, 0.94);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.loading-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.loading-paper {
+    background: var(--paper-ivory);
+    color: #222;
+    padding: 30px 45px;
+    border-radius: 6px;
+    border: 2px solid var(--ink-blue);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
+    text-align: center;
+    max-width: 440px;
+    position: relative;
+}
+
+.loading-paper::before {
+    content: "";
+    position: absolute;
+    left: 20px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: rgba(220, 75, 75, 0.4);
+}
+
+.loading-pen-icon {
+    font-size: 38px;
+    margin-bottom: 8px;
+    display: inline-block;
+    animation: penFlick 1.2s infinite ease-in-out;
+}
+
+@keyframes penFlick {
+    0%, 100% { transform: rotate(-20deg) scale(1); }
+    50% { transform: rotate(25deg) scale(1.1); }
+}
+
+.loading-title {
+    font-size: 22px;
+    color: var(--ink-blue);
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.loading-subtitle {
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 18px;
+}
+
+.progress-track {
+    width: 100%;
+    height: 12px;
+    background: #e2dac7;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #b8ab92;
+    position: relative;
+}
+
+.progress-bar {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #163ca0, #2b6bf3);
+    transition: width 0.2s ease;
+    border-radius: 6px;
+}
+
+.loading-status-text {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #777;
+}
+
+/* Toast Notification (Notebook Paper Slip) */
+.toast-notice {
+    position: fixed;
+    top: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fffdf5;
+    color: var(--ink-blue);
+    border: 2px solid var(--ink-blue);
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: top 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none;
+}
+
+.toast-notice.show {
+    top: 24px;
+}
+
+.toast-icon {
+    font-size: 20px;
+}
+
+/* Bottom Quick Info & Viral Action Tray */
+.action-tray {
+    width: 100%;
+    max-width: 1280px;
+    padding: 10px 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.tray-shortcuts {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #9eb1a4;
+}
+
+.kbd {
+    display: inline-block;
+    padding: 2px 7px;
+    font-size: 12px;
+    font-family: monospace;
+    font-weight: bold;
+    color: #ffd276;
+    background: #2a2016;
+    border: 1px solid #5a422a;
+    border-radius: 4px;
+    box-shadow: 0 2px 0 #18120c;
+}
+
+.tray-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-tray {
+    padding: 8px 16px;
+    border-radius: 5px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+
+.btn-twitter {
+    background: #000000;
+    color: #ffffff;
+    border: 1px solid #333;
+}
+
+.btn-twitter:hover {
+    background: #111;
+    border-color: #555;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.btn-copy {
+    background: #193826;
+    color: #a4f2be;
+    border: 1px solid #2d6344;
+}
+
+.btn-copy:hover {
+    background: #234c34;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.btn-fullscreen {
+    background: #29241d;
+    color: #e5d3b6;
+    border: 1px solid #544431;
+}
+
+.btn-fullscreen:hover {
+    background: #3a3227;
+    transform: translateY(-2px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+    .classroom-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .action-tray {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .tray-shortcuts {
+        display: none;
+    }
+    .tray-buttons {
+        width: 100%;
+        justify-content: center;
+    }
+}
