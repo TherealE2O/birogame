@@ -97,6 +97,9 @@ def main():
         "allocateUTF8"
     ]
     
+    exported_funcs_str = ",".join(exported_funcs)
+    exported_runtime_str = ",".join(exported_runtime)
+
     out_js = os.path.join(out_dir, "biro_game.js")
     
     cmd = [
@@ -114,11 +117,11 @@ def main():
         f"-I{engine_inc}",
         f"-I{engine_src}",
         f"-I{raylib_web_inc}",
-        "-s", "USE_GLFW=3",
-        "-s", "ALLOW_MEMORY_GROWTH=1",
-        "-s", "STACK_SIZE=1048576",
-        "-s", f"EXPORTED_FUNCTIONS={exported_funcs}",
-        "-s", f"EXPORTED_RUNTIME_METHODS={exported_runtime}",
+        "-sUSE_GLFW=3",
+        "-sALLOW_MEMORY_GROWTH=1",
+        "-sSTACK_SIZE=1048576",
+        f"-sEXPORTED_FUNCTIONS={exported_funcs_str}",
+        f"-sEXPORTED_RUNTIME_METHODS={exported_runtime_str}",
         "-o", out_js
     ]
 
