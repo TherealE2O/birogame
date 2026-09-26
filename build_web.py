@@ -103,6 +103,7 @@ def main():
         emcc_bin,
         "-O2",
         "-DPLATFORM_WEB",
+        "-DBOX2D_DISABLE_SIMD",
         "-Wall",
         "-Wno-unused-variable",
         "-Wno-unused-function",

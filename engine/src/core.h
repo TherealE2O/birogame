@@ -72,7 +72,11 @@
 		#define B2_SIMD_WIDTH 4
 	#elif defined( B2_CPU_WASM )
 		#define B2_CPU_WASM
-		#define B2_SIMD_SSE2
+		#if defined( __SSE2__ )
+			#define B2_SIMD_SSE2
+		#else
+			#define B2_SIMD_NONE
+		#endif
 		#define B2_SIMD_WIDTH 4
 	#else
 		#define B2_SIMD_NONE
