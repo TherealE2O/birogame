@@ -84,6 +84,12 @@ def main():
         "_SetOnlineRoomCode",
         "_SetOnlineConnectionStatus",
         "_SetTouchControlMode",
+        "_SetStageAxis",
+        "_SetTableType",
+        "_ToggleGamePause",
+        "_SetGamePaused",
+        "_RestartCurrentRound",
+        "_ResetFullMatch",
         "_RestartMatchFromNetwork",
         "_GetGameActivePlayer",
         "_GetGameMatchState",
@@ -155,6 +161,18 @@ def copy_web_assets(web_src_dir, out_dir, root):
             shutil.copy2(src_path, os.path.join(out_dir, f))
             print(f"  Copied {f} -> {out_dir}")
             
+    # Copy web assets folder (mode previews, table previews, pairing tutorial GIF)
+    src_assets = os.path.join(web_src_dir, "assets")
+    dst_assets = os.path.join(out_dir, "assets")
+    if os.path.exists(src_assets):
+        os.makedirs(dst_assets, exist_ok=True)
+        for item in os.listdir(src_assets):
+            s = os.path.join(src_assets, item)
+            d = os.path.join(dst_assets, item)
+            if os.path.isfile(s):
+                shutil.copy2(s, d)
+        print(f"  Copied assets folder -> {dst_assets}")
+
     # Copy preview image for rich social card embeds (Twitter/OpenGraph)
     preview_img = os.path.join(root, "test_ai_gameplay.png")
     if os.path.exists(preview_img):

@@ -488,6 +488,9 @@ typedef struct {
     Vector2 touchSwipeCurrent;         // screen position where finger currently is
     float   touchSwipeStartTime;       // GetTime() timestamp when swipe started
     float   swipeMissFeedbackTimer;    // timer to display "Swipe across the pen!" feedback
+
+    // ---- Single Menu / Pause Modal ----
+    bool    isPausedMenuOpen;          // true when user clicked [ ⏸ MENU ] or pressed ESC
 } GameContext;
 
 static GameContext g_game = {0};
@@ -523,6 +526,11 @@ EM_JS(void, JS_RequestRoomCode, (void), {
         window.initOnlineHost();
     }
 });
+EM_JS(void, JS_ToggleNotebookMenu, (void), {
+    if (typeof window.toggleNotebookMenu === 'function') {
+        window.toggleNotebookMenu();
+    }
+});
 #else
 static void JS_SendNetworkStrike(int player, float ptX, float ptY, float angle, float power) { (void)player; (void)ptX; (void)ptY; (void)angle; (void)power; }
 static void JS_SendNetworkSync(int player, float x, float y, float angle, int elim, int score) { (void)player; (void)x; (void)y; (void)angle; (void)elim; (void)score; }
@@ -530,6 +538,7 @@ static void JS_SendRoundRestart(int mode, int stage, int table) { (void)mode; (v
 static void JS_CopyRoomLink(void) {}
 static void JS_TweetChallenge(void) {}
 static void JS_RequestRoomCode(void) {}
+static void JS_ToggleNotebookMenu(void) {}
 #endif
 
 static Sound GenFlickSound(void) {
@@ -1267,6 +1276,73 @@ static void DrawMarketPenPreview(PenModelId modelId, Color primaryColor, Color c
     rlPopMatrix();
 }
 
+// Classroom Notebook Pause / Settings Modal
+static void DrawPauseMenuModal(Vector2 mouse) {
+    // Dim background overlay
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){ 10, 15, 12, 210 });
+
+    Rectangle modal = { 390, 125, 500, 470 };
+
+    // Drop shadow
+    DrawRectangleRounded((Rectangle){ modal.x + 6, modal.y + 6, modal.width, modal.height }, 0.05f, 4, (Color){ 0, 0, 0, 140 });
+
+    // Notebook Cream Paper
+    DrawRectangleRounded(modal, 0.05f, 4, (Color){ 250, 246, 238, 255 });
+    DrawRectangleRoundedLines(modal, 0.05f, 4, (Color){ 20, 20, 20, 255 });
+
+    // Top spiral holes binding strip
+    DrawRectangle(modal.x, modal.y, modal.width, 36, (Color){ 235, 228, 215, 255 });
+    DrawLine(modal.x, modal.y + 36, modal.x + modal.width, modal.y + 36, (Color){ 190, 180, 160, 255 });
+    for (int i = 0; i < 9; i++) {
+        float hx = modal.x + 35 + i * 53;
+        DrawCircle(hx, modal.y + 18, 6.0f, (Color){ 30, 30, 30, 255 });
+        DrawCircleLines(hx, modal.y + 18, 6.0f, (Color){ 80, 80, 80, 255 });
+    }
+
+    // Header Title
+    DrawSchoolTextTitle("CLASSROOM PAUSED", modal.x + modal.width * 0.5f - 110, modal.y + 48, 26, (Color){ 17, 17, 17, 255 });
+    DrawSchoolText("Active match is frozen - Biro positions are preserved", modal.x + modal.width * 0.5f - 145, modal.y + 78, 13, (Color){ 80, 80, 80, 255 });
+
+    // Match status pill
+    Rectangle statusPill = { modal.x + 35, modal.y + 102, modal.width - 70, 30 };
+    DrawRectangleRounded(statusPill, 0.2f, 4, (Color){ 240, 235, 222, 255 });
+    DrawRectangleRoundedLines(statusPill, 0.2f, 4, (Color){ 180, 175, 160, 255 });
+    const char* summary = TextFormat("%s  |  %s  |  %s",
+        g_gameModeNames[g_game.currentGameMode],
+        g_tableTypeNames[g_game.currentTableType],
+        g_stageNames[g_game.currentStage]);
+    DrawSchoolText(summary, statusPill.x + 12, statusPill.y + 8, 12, (Color){ 40, 40, 40, 255 });
+
+    // 5 Action Buttons
+    const char* btnTitles[] = {
+        ">  RESUME MATCH",
+        "R  RESTART ROUND",
+        "S  DESK SETUP / LOBBY",
+        "P  PEN MARKET (STATIONERY)",
+        "X  NEW MATCH / RESET"
+    };
+
+    for (int i = 0; i < 5; i++) {
+        Rectangle btn = { modal.x + 40, modal.y + 148 + i * 56, modal.width - 80, 46 };
+        bool isHover = CheckCollisionPointRec(mouse, btn);
+
+        Color bg = isHover ? (Color){ 20, 20, 20, 255 } : (Color){ 255, 255, 255, 255 };
+        Color fg = isHover ? (Color){ 250, 246, 238, 255 } : (Color){ 20, 20, 20, 255 };
+        Color border = (Color){ 20, 20, 20, 255 };
+
+        DrawRectangleRounded(btn, 0.15f, 4, bg);
+        DrawRectangleRoundedLines(btn, 0.15f, 4, border);
+
+        int fsz = (i == 0) ? 17 : 15;
+        int tw = MeasureText(btnTitles[i], fsz);
+        DrawSchoolTextTitle(btnTitles[i], btn.x + btn.width * 0.5f - tw * 0.5f, btn.y + (btn.height - fsz) * 0.5f - 2, fsz, fg);
+    }
+
+    if (g_game.matchType == MATCH_ONLINE_P2P) {
+        DrawSchoolText("* Note: In Online P2P, desks remain synchronized.", modal.x + 50, modal.y + modal.height - 24, 11, (Color){ 100, 100, 100, 255 });
+    }
+}
+
 // HUD Scoreboard & Dynamic Turn Banners with Non-Pausing High-Pressure Turn Timer
 static void DrawHUD(void) {
     int activePlayer = g_game.activePlayer;
@@ -1294,67 +1370,35 @@ static void DrawHUD(void) {
     DrawSchoolTextTitle("BIRO CLASH", 14, 10, 26, (Color){ 255, 218, 105, 255 });
     DrawSchoolText("DESK PHYSICS", 16, 42, 13, (Color){ 195, 220, 205, 220 });
 
-    // ARENA SELECTION BADGE [TAB] - Styled as Masking Tape Strip
-    Rectangle arenaRect = { 146, 12, 96, 44 };
-    DrawRectangleRounded(arenaRect, 0.15f, 4, (Color){ 238, 228, 202, 245 });
-    DrawRectangleRoundedLines(arenaRect, 0.15f, 4, (Color){ 195, 182, 150, 255 });
-    DrawSchoolText("[TAB] ARENA:", arenaRect.x + 6, arenaRect.y + 4, 12, (Color){ 185, 45, 45, 255 });
-    DrawSchoolTextTitle(g_tableTypeNames[tableType], arenaRect.x + 6, arenaRect.y + 20, 13, (Color){ 30, 35, 45, 255 });
+    // 2. SINGLE PROMINENT MENU BUTTON [ || MENU ]
+    Rectangle menuBtn = { 152, 12, 126, 44 };
+    bool isMenuHover = CheckCollisionPointRec(GetMousePosition(), menuBtn);
+    Color menuBg = isMenuHover ? (Color){ 20, 20, 20, 255 } : (Color){ 250, 246, 238, 255 };
+    Color menuFg = isMenuHover ? (Color){ 250, 246, 238, 255 } : (Color){ 20, 20, 20, 255 };
 
-    // MODE SELECTION BADGE [M] - Masking Tape Strip
-    Rectangle modeRect = { 248, 12, 92, 44 };
-    DrawRectangleRounded(modeRect, 0.15f, 4, (Color){ 238, 228, 202, 245 });
-    DrawRectangleRoundedLines(modeRect, 0.15f, 4, (Color){ 195, 182, 150, 255 });
-    DrawSchoolText("[M] MODE:", modeRect.x + 6, modeRect.y + 4, 12, (Color){ 22, 60, 150, 255 });
-    DrawSchoolTextTitle(g_gameModeNames[mode], modeRect.x + 6, modeRect.y + 20, 14, (Color){ 30, 35, 45, 255 });
+    DrawRectangleRounded(menuBtn, 0.15f, 4, menuBg);
+    DrawRectangleRoundedLines(menuBtn, 0.15f, 4, (Color){ 20, 20, 20, 255 });
+    DrawSchoolTextTitle("[ || MENU ]", menuBtn.x + 14, menuBtn.y + 12, 17, menuFg);
 
-    // STAGE AXIS BADGE [S] - Masking Tape Strip
-    Rectangle stageRect = { 346, 12, 98, 44 };
-    DrawRectangleRounded(stageRect, 0.15f, 4, (Color){ 238, 228, 202, 245 });
-    DrawRectangleRoundedLines(stageRect, 0.15f, 4, (Color){ 195, 182, 150, 255 });
-    DrawSchoolText("[S] STAGE:", stageRect.x + 6, stageRect.y + 4, 12, (Color){ 25, 120, 60, 255 });
-    DrawSchoolTextTitle(g_stageNames[stage], stageRect.x + 6, stageRect.y + 20, 13, (Color){ 30, 35, 45, 255 });
+    // 3. CALM MATCH SETUP INFO STRIP (Quiet reading slip, no clutter buttons)
+    Rectangle infoStrip = { 292, 12, 490, 44 };
+    DrawRectangleRounded(infoStrip, 0.12f, 4, (Color){ 245, 241, 232, 235 });
+    DrawRectangleRoundedLines(infoStrip, 0.12f, 4, (Color){ 160, 155, 140, 200 });
 
-    // MATCH TYPE BADGE [O] - Masking Tape Strip
-    Rectangle matchRect = { 450, 12, 112, 44 };
-    DrawRectangleRounded(matchRect, 0.15f, 4, (Color){ 242, 235, 218, 245 });
-    DrawRectangleRoundedLines(matchRect, 0.15f, 4, (Color){ 190, 160, 110, 255 });
-    DrawSchoolText("[O] MATCH:", matchRect.x + 6, matchRect.y + 4, 12, (Color){ 160, 65, 20, 255 });
-    DrawSchoolTextTitle(g_matchTypeNames[matchType], matchRect.x + 6, matchRect.y + 20, 14, (Color){ 25, 30, 40, 255 });
+    const char* modeStr = g_gameModeNames[mode];
+    const char* tableStr = g_tableTypeNames[tableType];
+    const char* stageStr = g_stageNames[stage];
+    DrawSchoolText("ACTIVE DESK SETUP", infoStrip.x + 12, infoStrip.y + 4, 11, (Color){ 90, 85, 75, 255 });
 
-    // DYNAMIC CONTEXT BADGE [I] / [ONLINE STATUS]
-    Rectangle ctxRect = { 568, 12, 114, 44 };
-    if (matchType == MATCH_SINGLE_PLAYER_AI) {
-        DrawRectangleRounded(ctxRect, 0.15f, 4, (Color){ 235, 245, 238, 245 });
-        DrawRectangleRoundedLines(ctxRect, 0.15f, 4, (Color){ 45, 140, 75, 255 });
-        DrawSchoolText("[I] AI BOT:", ctxRect.x + 6, ctxRect.y + 4, 12, (Color){ 25, 125, 60, 255 });
-        DrawSchoolTextTitle(g_aiDifficultyNames[aiDiff], ctxRect.x + 6, ctxRect.y + 20, 13, (Color){ 20, 35, 25, 255 });
-    } else if (matchType == MATCH_ONLINE_P2P) {
-        DrawRectangleRounded(ctxRect, 0.15f, 4, (Color){ 235, 242, 255, 245 });
-        DrawRectangleRoundedLines(ctxRect, 0.15f, 4, (Color){ 35, 80, 195, 255 });
+    if (matchType == MATCH_ONLINE_P2P) {
         const char* rCode = (strlen(g_game.onlineRoomCode) > 0) ? g_game.onlineRoomCode : "PEN1";
-        DrawSchoolText(TextFormat("ROOM: %s", rCode), ctxRect.x + 6, ctxRect.y + 4, 11, (Color){ 22, 60, 160, 255 });
-        if (g_game.isOnlineConnected) {
-            DrawCircle(ctxRect.x + 12, ctxRect.y + 28, 4.0f, (Color){ 30, 190, 80, 255 });
-            DrawSchoolTextTitle("CONNECTED", ctxRect.x + 22, ctxRect.y + 20, 12, (Color){ 20, 130, 50, 255 });
-        } else {
-            DrawCircle(ctxRect.x + 12, ctxRect.y + 28, 4.0f, (Color){ 235, 150, 30, 255 });
-            DrawSchoolTextTitle("WAITING...", ctxRect.x + 22, ctxRect.y + 20, 12, (Color){ 195, 110, 15, 255 });
-        }
-    } else { // LOCAL 2P
-        DrawRectangleRounded(ctxRect, 0.15f, 4, (Color){ 244, 244, 248, 245 });
-        DrawRectangleRoundedLines(ctxRect, 0.15f, 4, (Color){ 140, 145, 160, 255 });
-        DrawSchoolText("PASS & PLAY:", ctxRect.x + 6, ctxRect.y + 4, 12, (Color){ 90, 95, 110, 255 });
-        DrawSchoolTextTitle("LOCAL DESK", ctxRect.x + 6, ctxRect.y + 20, 13, (Color){ 40, 45, 55, 255 });
+        const char* connStr = g_game.isOnlineConnected ? "ONLINE: CONNECTED" : "ONLINE: WAITING...";
+        DrawSchoolTextTitle(TextFormat("%s  |  %s  |  ROOM: %s (%s)", modeStr, tableStr, rCode, connStr),
+                            infoStrip.x + 12, infoStrip.y + 20, 13, (Color){ 20, 20, 20, 255 });
+    } else {
+        DrawSchoolTextTitle(TextFormat("%s  |  %s  |  %s", modeStr, tableStr, stageStr),
+                            infoStrip.x + 12, infoStrip.y + 20, 13, (Color){ 20, 20, 20, 255 });
     }
-
-    // PEN MARKET BADGE [P] - Official Teacher's Red Ink Rubber Stamp!
-    Rectangle marketRect = { 688, 12, 108, 44 };
-    DrawRectangleRounded(marketRect, 0.15f, 4, (Color){ 52, 24, 24, 250 });
-    DrawRectangleRoundedLines(marketRect, 0.15f, 4, (Color){ 220, 55, 65, 255 });
-    DrawRectangleLines((int)marketRect.x + 3, (int)marketRect.y + 3, (int)marketRect.width - 6, (int)marketRect.height - 6, (Color){ 180, 40, 50, 180 });
-    DrawSchoolTextTitle("[P] MARKET", marketRect.x + 8, marketRect.y + 4, 15, (Color){ 255, 105, 115, 255 });
-    DrawSchoolText("STATIONERY", marketRect.x + 8, marketRect.y + 24, 12, (Color){ 245, 215, 215, 230 });
 
     // SCORES DISPLAY (School Report Card Slips with Gold Star Stickers)
     if (mode == MODE_1V1) {
@@ -1470,21 +1514,21 @@ static void DrawHUD(void) {
         DrawLine(x, SCREEN_HEIGHT - 36, x, SCREEN_HEIGHT - 36 + h, (Color){ 130, 95, 60, 160 });
     }
     if (g_game.isTouchMode) {
-        DrawSchoolText("MOBILE TOUCH: [SWIPE ACROSS THE BIRO TO FLICK]  |  Fast Swipe = Power  |  Rear Swipe = Spear Move",
+        DrawSchoolText("MOBILE TOUCH: [SWIPE ACROSS THE BIRO TO FLICK]  |  Fast Swipe = Power  |  [MENU]: Pause & Settings",
                        18, SCREEN_HEIGHT - 25, 14, (Color){ 238, 225, 195, 230 });
     } else {
-        DrawSchoolText("PC MOUSE: [HOVER ON PEN] + [HOLD CLICK TO CHARGE RULER] + [RELEASE TO FLICK]  |  [P]: Market  |  [O]: Match  |  [TAB]: Arena",
+        DrawSchoolText("PC MOUSE: [HOVER ON PEN] + [HOLD CLICK TO CHARGE RULER] + [RELEASE TO FLICK]  |  [ESC] / [M]: Pause & Settings",
                        18, SCREEN_HEIGHT - 25, 14, (Color){ 238, 225, 195, 230 });
     }
 
     // Clickable toggle button in bottom right corner
-    Rectangle ctrlToggleRect = { SCREEN_WIDTH - 215, SCREEN_HEIGHT - 32, 205, 26 };
+    Rectangle ctrlToggleRect = { SCREEN_WIDTH - 200, SCREEN_HEIGHT - 32, 190, 26 };
     bool hovToggle = CheckCollisionPointRec(GetMousePosition(), ctrlToggleRect);
     DrawRectangleRounded(ctrlToggleRect, 0.25f, 4, hovToggle ? (Color){ 55, 65, 58, 255 } : (Color){ 28, 22, 16, 255 });
-    DrawRectangleRoundedLines(ctrlToggleRect, 0.25f, 4, g_game.isTouchMode ? (Color){ 50, 190, 95, 255 } : (Color){ 230, 185, 60, 255 });
-    const char* ctrlTxt = g_game.isTouchMode ? "[ 📱 TOUCH SWIPE ]" : "[ 🖱️ PC MOUSE AIM ]";
+    DrawRectangleRoundedLines(ctrlToggleRect, 0.25f, 4, (Color){ 200, 190, 170, 255 });
+    const char* ctrlTxt = g_game.isTouchMode ? "[ TOUCH SWIPE ]" : "[ PC MOUSE AIM ]";
     float ctw = MeasureSchoolTextTitle(ctrlTxt, 13);
-    DrawSchoolTextTitle(ctrlTxt, ctrlToggleRect.x + ctrlToggleRect.width * 0.5f - ctw * 0.5f, ctrlToggleRect.y + 5, 13, g_game.isTouchMode ? (Color){ 130, 245, 160, 255 } : (Color){ 255, 235, 140, 255 });
+    DrawSchoolTextTitle(ctrlTxt, ctrlToggleRect.x + ctrlToggleRect.width * 0.5f - ctw * 0.5f, ctrlToggleRect.y + 5, 13, (Color){ 250, 246, 238, 255 });
 }
 
 // Live Physics Telemetry Box (Toggleable with [T])
@@ -2237,54 +2281,51 @@ static void UpdateDrawFrame(void) {
 
     int numP = (g_game.currentGameMode == MODE_1V1) ? 2 : 4;
 
-    // Check clicking Top Blotter Badges (so web and mouse players can click easily)
-    Rectangle arenaRect = { 146, 12, 96, 44 };
-    Rectangle modeRect  = { 248, 12, 92, 44 };
-    Rectangle stageRect = { 346, 12, 98, 44 };
-    Rectangle matchRect = { 450, 12, 112, 44 };
-    Rectangle ctxRect   = { 568, 12, 114, 44 };
-    Rectangle marketRect= { 688, 12, 108, 44 };
-
+    // Single Menu Button [ ⏸ MENU ]
+    Rectangle menuBtn = { 152, 12, 126, 44 };
     bool clickHandled = false;
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && mouse.y < 68 && g_game.state != STATE_PEN_MARKET && !g_game.showOnlineModal) {
-        if (CheckCollisionPointRec(mouse, arenaRect)) {
-            g_game.currentTableType = (TableType)((g_game.currentTableType + 1) % 3);
-            SetupTableColliders(g_game.worldId, g_game.currentTableType, &g_game.topBarrierBody, &g_game.bottomBarrierBody);
+        if (CheckCollisionPointRec(mouse, menuBtn)) {
+            g_game.isPausedMenuOpen = !g_game.isPausedMenuOpen;
             if (g_audio.audioReady) PlaySound(g_audio.sndTick);
+            JS_ToggleNotebookMenu();
             clickHandled = true;
-        } else if (CheckCollisionPointRec(mouse, modeRect)) {
-            g_game.currentGameMode = (GameMode)((g_game.currentGameMode + 1) % 3);
-            ResetMatchScoresAndBiros();
-            if (g_audio.audioReady) PlaySound(g_audio.sndTick);
-            clickHandled = true;
-        } else if (CheckCollisionPointRec(mouse, stageRect)) {
-            g_game.currentStage = (StageRack)((g_game.currentStage + 1) % 3);
-            ResetAllBirosForModeAndStage(g_game.biros, g_game.currentGameMode, g_game.currentStage);
-            ResetTurnToPlayer0();
-            if (g_audio.audioReady) PlaySound(g_audio.sndTick);
-            clickHandled = true;
-        } else if (CheckCollisionPointRec(mouse, matchRect)) {
-            g_game.matchType = (MatchType)((g_game.matchType + 1) % 3);
-            if (g_game.matchType == MATCH_ONLINE_P2P) {
-                g_game.showOnlineModal = true;
-                JS_RequestRoomCode();
+        }
+    }
+
+    // Handle clicks inside Classroom Pause Menu Modal
+    if (g_game.isPausedMenuOpen) {
+        Rectangle modal = { 390, 125, 500, 470 };
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            for (int i = 0; i < 5; i++) {
+                Rectangle btn = { modal.x + 40, modal.y + 148 + i * 56, modal.width - 80, 46 };
+                if (CheckCollisionPointRec(mouse, btn)) {
+                    if (g_audio.audioReady) PlaySound(g_audio.sndTick);
+                    if (i == 0) {
+                        // 1. Resume Match (keeps pens in place!)
+                        g_game.isPausedMenuOpen = false;
+                    } else if (i == 1) {
+                        // 2. Restart Round
+                        ResetAllBirosForModeAndStage(g_game.biros, g_game.currentGameMode, g_game.currentStage);
+                        ResetTurnToPlayer0();
+                        g_game.isPausedMenuOpen = false;
+                    } else if (i == 2) {
+                        // 3. Desk Setup / Lobby
+                        JS_ToggleNotebookMenu();
+                    } else if (i == 3) {
+                        // 4. Pen Market
+                        g_game.state = STATE_PEN_MARKET;
+                        g_game.marketSelectedPlayer = g_game.activePlayer;
+                        g_game.isPausedMenuOpen = false;
+                    } else if (i == 4) {
+                        // 5. New Match / Reset
+                        ResetMatchScoresAndBiros();
+                        g_game.isPausedMenuOpen = false;
+                    }
+                    clickHandled = true;
+                    break;
+                }
             }
-            if (g_audio.audioReady) PlaySound(g_audio.sndTick);
-            clickHandled = true;
-        } else if (CheckCollisionPointRec(mouse, ctxRect)) {
-            if (g_game.matchType == MATCH_SINGLE_PLAYER_AI) {
-                g_game.aiDifficulty = (AIDifficulty)((g_game.aiDifficulty + 1) % 4);
-                if (g_audio.audioReady) PlaySound(g_audio.sndTick);
-            } else if (g_game.matchType == MATCH_ONLINE_P2P) {
-                g_game.showOnlineModal = !g_game.showOnlineModal;
-                if (g_audio.audioReady) PlaySound(g_audio.sndTick);
-            }
-            clickHandled = true;
-        } else if (CheckCollisionPointRec(mouse, marketRect)) {
-            g_game.state = STATE_PEN_MARKET;
-            g_game.marketSelectedPlayer = g_game.activePlayer;
-            if (g_audio.audioReady) PlaySound(g_audio.sndTick);
-            clickHandled = true;
         }
     }
 
@@ -2300,41 +2341,27 @@ static void UpdateDrawFrame(void) {
     if (IsKeyPressed(KEY_C)) g_game.showDebugColliders = !g_game.showDebugColliders;
     if (IsKeyPressed(KEY_T)) g_game.showTelemetry = !g_game.showTelemetry;
 
-    if (IsKeyPressed(KEY_S) && g_game.state != STATE_PEN_MARKET && !g_game.showOnlineModal) {
-        g_game.currentStage = (StageRack)((g_game.currentStage + 1) % 3);
-        ResetAllBirosForModeAndStage(g_game.biros, g_game.currentGameMode, g_game.currentStage);
-        ResetTurnToPlayer0();
-    }
-
-    if (IsKeyPressed(KEY_TAB) && g_game.state != STATE_PEN_MARKET && !g_game.showOnlineModal) {
-        g_game.currentTableType = (TableType)((g_game.currentTableType + 1) % 3);
-        SetupTableColliders(g_game.worldId, g_game.currentTableType, &g_game.topBarrierBody, &g_game.bottomBarrierBody);
-    }
-
     if (IsKeyPressed(KEY_M) && g_game.state != STATE_PEN_MARKET && !g_game.showOnlineModal) {
-        g_game.currentGameMode = (GameMode)((g_game.currentGameMode + 1) % 3);
-        ResetMatchScoresAndBiros();
+        g_game.isPausedMenuOpen = !g_game.isPausedMenuOpen;
+        JS_ToggleNotebookMenu();
     }
 
-    if (IsKeyPressed(KEY_O) && g_game.state != STATE_PEN_MARKET) {
-        g_game.matchType = (MatchType)((g_game.matchType + 1) % 3);
-        if (g_game.matchType == MATCH_ONLINE_P2P) {
-            g_game.showOnlineModal = true;
-            JS_RequestRoomCode();
+    if (IsKeyPressed(KEY_ESCAPE)) {
+        if (g_game.state == STATE_PEN_MARKET) {
+            g_game.state = STATE_AIMING;
+        } else if (g_game.showOnlineModal) {
+            g_game.showOnlineModal = false;
+        } else {
+            g_game.isPausedMenuOpen = !g_game.isPausedMenuOpen;
+            JS_ToggleNotebookMenu();
         }
-        if (g_audio.audioReady) PlaySound(g_audio.sndTick);
     }
 
-    if (IsKeyPressed(KEY_I) && g_game.state != STATE_PEN_MARKET) {
-        g_game.aiDifficulty = (AIDifficulty)((g_game.aiDifficulty + 1) % 4);
-        if (g_audio.audioReady) PlaySound(g_audio.sndTick);
-    }
-
-    if (IsKeyPressed(KEY_R) && g_game.state != STATE_PEN_MARKET && !g_game.showOnlineModal) {
+    if (IsKeyPressed(KEY_R) && g_game.state != STATE_PEN_MARKET && !g_game.showOnlineModal && !g_game.isPausedMenuOpen) {
         ResetMatchScoresAndBiros();
     }
 
-    if (IsKeyPressed(KEY_P)) {
+    if (IsKeyPressed(KEY_P) && !g_game.isPausedMenuOpen) {
         if (g_game.state == STATE_PEN_MARKET) {
             g_game.state = STATE_AIMING;
         } else if (g_game.state == STATE_AIMING || g_game.state == STATE_ROUND_OVER) {
@@ -2350,18 +2377,13 @@ static void UpdateDrawFrame(void) {
     Biro* currentBiro = &g_game.biros[g_game.activePlayer];
 
     // Quick cycle pen model with [K]
-    if (IsKeyPressed(KEY_K) && g_game.state == STATE_AIMING && !g_game.showOnlineModal) {
+    if (IsKeyPressed(KEY_K) && g_game.state == STATE_AIMING && !g_game.showOnlineModal && !g_game.isPausedMenuOpen) {
         EquipPenModel(currentBiro, (PenModelId)((currentBiro->modelId + 1) % NUM_PEN_MODELS));
         if (g_audio.audioReady) PlaySound(g_audio.sndTick);
     }
 
-    // If online modal is open, handle ESC to close
-    if (g_game.showOnlineModal) {
-        if (IsKeyPressed(KEY_ESCAPE)) {
-            g_game.showOnlineModal = false;
-        }
-    } else {
-        // Run AI Bot if it's the AI's turn!
+    // Run AI Bot if it's the AI's turn!
+    if (!g_game.showOnlineModal && !g_game.isPausedMenuOpen) {
         if (g_game.state == STATE_AIMING && g_game.matchType == MATCH_SINGLE_PLAYER_AI && g_game.activePlayer != 0) {
             UpdateAIBotTurn(dt);
         }
@@ -2384,7 +2406,7 @@ static void UpdateDrawFrame(void) {
         }
 
         case STATE_AIMING: {
-            if (g_game.showOnlineModal) break;
+            if (g_game.showOnlineModal || g_game.isPausedMenuOpen) break;
 
             g_game.turnTimer -= dt;
             int curSec = (int)g_game.turnTimer;
@@ -3090,6 +3112,10 @@ static void UpdateDrawFrame(void) {
         DrawOnlineModal(mouse);
     }
 
+    if (g_game.isPausedMenuOpen) {
+        DrawPauseMenuModal(mouse);
+    }
+
     if (IsKeyPressed(KEY_F12)) {
         TakeScreenshot("biro_game_screenshot.png");
     }
@@ -3188,6 +3214,33 @@ EMSCRIPTEN_EXPORT int GetGameMatchState(void) {
     return (int)g_game.state;
 }
 
+EMSCRIPTEN_EXPORT void SetStageAxis(int stage) {
+    g_game.currentStage = (StageRack)(stage % 3);
+    ResetAllBirosForModeAndStage(g_game.biros, g_game.currentGameMode, g_game.currentStage);
+}
+
+EMSCRIPTEN_EXPORT void SetTableType(int table) {
+    g_game.currentTableType = (TableType)(table % 3);
+    SetupTableColliders(g_game.worldId, g_game.currentTableType, &g_game.topBarrierBody, &g_game.bottomBarrierBody);
+}
+
+EMSCRIPTEN_EXPORT void ToggleGamePause(void) {
+    g_game.isPausedMenuOpen = !g_game.isPausedMenuOpen;
+}
+
+EMSCRIPTEN_EXPORT void SetGamePaused(int paused) {
+    g_game.isPausedMenuOpen = (bool)paused;
+}
+
+EMSCRIPTEN_EXPORT void RestartCurrentRound(void) {
+    ResetAllBirosForModeAndStage(g_game.biros, g_game.currentGameMode, g_game.currentStage);
+    ResetTurnToPlayer0();
+}
+
+EMSCRIPTEN_EXPORT void ResetFullMatch(void) {
+    ResetMatchScoresAndBiros();
+}
+
 // Main Game Application
 int main(int argc, char** argv) {
     g_game.currentTableType = TABLE_FRONT_BARRIER;
@@ -3219,6 +3272,8 @@ int main(int argc, char** argv) {
             g_game.matchType = (MatchType)(atoi(argv[++i]) % 3);
         } else if (strcmp(argv[i], "--ai-diff") == 0 && i + 1 < argc) {
             g_game.aiDifficulty = (AIDifficulty)(atoi(argv[++i]) % 4);
+        } else if (strcmp(argv[i], "--pause") == 0) {
+            g_game.isPausedMenuOpen = true;
         } else if (strcmp(argv[i], "--market") == 0) {
             g_game.startInMarket = true;
         } else if (strcmp(argv[i], "--p1-model") == 0 && i + 1 < argc) {

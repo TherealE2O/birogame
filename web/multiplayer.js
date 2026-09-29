@@ -101,10 +101,12 @@
     function c_applyMenuSettings(s) {
         if (!window.Module || !Module._SetMatchMode) return;
         try {
-            Module._SetGameMode(s.mode || 0);
-            Module._SetMatchMode(s.matchType || 0);
-            Module._SetAIDifficulty(s.aiDiff || 1);
-            if (s.matchType === 2) {
+            if (Module._SetGameMode) Module._SetGameMode(s.mode || 0);
+            if (Module._SetStageAxis) Module._SetStageAxis(s.stage || 0);
+            if (Module._SetTableType) Module._SetTableType(s.table || 0);
+            if (Module._SetMatchMode) Module._SetMatchMode(s.matchType || 0);
+            if (Module._SetAIDifficulty) Module._SetAIDifficulty(s.aiDiff || 1);
+            if (s.matchType === 2 && Module._SetOnlineRole) {
                 Module._SetOnlineRole(net.isHost ? 1 : 0);
             }
             let touchMode = 0;
@@ -116,10 +118,31 @@
             if (Module._SetTouchControlMode) {
                 Module._SetTouchControlMode(touchMode);
             }
+            if (Module._SetGamePaused) {
+                Module._SetGamePaused(0);
+            }
         } catch (e) {
             console.warn('[MP] c_applyMenuSettings error', e);
         }
     }
+
+    window.toggleNotebookMenu = function() {
+        const menu = document.getElementById('mainMenu');
+        if (!menu) return;
+        if (menu.classList.contains('hidden')) {
+            menu.classList.remove('hidden');
+            if (window.Module && Module._SetGamePaused) {
+                Module._SetGamePaused(1);
+            }
+            const startBtn = document.getElementById('startBtn');
+            if (startBtn) startBtn.textContent = 'Resume Match  ▶';
+        } else {
+            menu.classList.add('hidden');
+            if (window.Module && Module._SetGamePaused) {
+                Module._SetGamePaused(0);
+            }
+        }
+    };
 
     /* ------------------------------------------------------------------
        QR Code helpers (uses qrcode.js from CDN)
@@ -133,7 +156,7 @@
                 text:           url,
                 width:          140,
                 height:         140,
-                colorDark:      '#163ca0',
+                colorDark:      '#111111',
                 colorLight:     '#faf6ec',
                 correctLevel:   QRCode.CorrectLevel.M
             });

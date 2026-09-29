@@ -3,33 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BIRO CLASH - School Desk Physics</title>
+    <title>BIRO CLASH - School Desk Physics | Box2D v3</title>
 
     <!-- Rich social cards -->
-    <meta name="description" content="Flick your biro across the school desk. Box2D v3 physics, 100% free P2P multiplayer.">
+    <meta name="description" content="Flick your biro across the Nigerian school desk. Box2D v3 physics, 100% free P2P multiplayer.">
     <meta property="og:title" content="BIRO CLASH - School Desk Physics">
     <meta property="og:description" content="Nigerian school desk biro flicking game. Box2D v3 + Raylib WebAssembly. Free P2P multiplayer.">
     <meta property="og:type" content="game">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="BIRO CLASH: School Desk Physics">
-    <meta name="twitter:description" content="Flick your biro, trigger Box2D v3 physics collisions, knock opponent off the desk! Free P2P multiplayer.">
+    <meta name="twitter:description" content="Flick your biro, trigger Box2D v3 impulse collisions, knock opponent off the desk! Free P2P multiplayer.">
 
-    <!-- Fonts: Kalam = handwriting title, Patrick Hand = body text -->
+    <!-- Fonts: Kalam = handwriting title, Patrick Hand = notebook body -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 
-    <!-- QR code generation (free CDN, no server needed) -->
+    <!-- QR code generation (client-side, 0 cost) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- PeerJS WebRTC -->
+    <!-- PeerJS WebRTC (0-cost P2P) -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
 
 <!-- ============================================================ -->
-<!--  PRE-GAME LOBBY / MENU                                       -->
-<!--  Shown immediately on page load. WASM compiles in background.-->
+<!--  PRE-GAME LOBBY / NOTEBOOK MENU                              -->
+<!--  Strict Cream (#FAF6EE), Black (#111111), and White palette  -->
 <!-- ============================================================ -->
 <div id="mainMenu" class="menu-backdrop">
 
@@ -45,51 +45,149 @@
             <div class="spiral-hole"></div><div class="spiral-hole"></div>
         </div>
 
-        <!-- Title -->
+        <!-- Title Block -->
         <div class="menu-title-block">
             <div class="menu-title">BIRO CLASH</div>
-            <div class="menu-subtitle">School Desk Physics &nbsp;·&nbsp; Box2D v3 + Raylib WebAssembly</div>
+            <div class="menu-subtitle">Classroom Desk Physics &nbsp;·&nbsp; Box2D v3 + Raylib WebAssembly</div>
         </div>
 
         <div class="menu-divider"></div>
 
-        <!-- SECTION 1: Game Mode -->
+        <!-- SECTION 1: Game Mode (with visual preview images) -->
         <div class="menu-section">
-            <div class="menu-label">Game Mode</div>
-            <div class="pill-row" id="modeRow">
-                <button class="pill pill-blue active" data-group="mode" data-val="0" onclick="selectPill(this)">1v1 Duel</button>
-                <button class="pill pill-blue" data-group="mode" data-val="1" onclick="selectPill(this)">2v2 Teams</button>
-                <button class="pill pill-blue" data-group="mode" data-val="2" onclick="selectPill(this)">Battle Royale</button>
+            <div class="menu-label">1. Choose Game Mode</div>
+            <div class="visual-card-grid" id="modeGrid">
+                <div class="visual-card active" data-group="mode" data-val="0" onclick="selectVisualCard(this)">
+                    <div class="card-check">✓</div>
+                    <img src="assets/preview_mode_1v1.png" alt="1v1 Classic Duel">
+                    <div class="visual-card-body">
+                        <div class="visual-card-title">1v1 Classic Duel</div>
+                        <div class="visual-card-desc">2 pens facing off head-to-head on the desk.</div>
+                    </div>
+                </div>
+
+                <div class="visual-card" data-group="mode" data-val="1" onclick="selectVisualCard(this)">
+                    <div class="card-check">✓</div>
+                    <img src="assets/preview_mode_2v2.png" alt="2v2 Team Clash">
+                    <div class="visual-card-body">
+                        <div class="visual-card-title">2v2 Team Battle</div>
+                        <div class="visual-card-desc">Blue pair vs Red pair with partner collisions.</div>
+                    </div>
+                </div>
+
+                <div class="visual-card" data-group="mode" data-val="2" onclick="selectVisualCard(this)">
+                    <div class="card-check">✓</div>
+                    <img src="assets/preview_mode_royale.png" alt="Battle Royale FFA">
+                    <div class="visual-card-body">
+                        <div class="visual-card-title">Battle Royale FFA</div>
+                        <div class="visual-card-desc">4 players in 4 corners. Last pen standing wins!</div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- SECTION 2: Match Type -->
+        <!-- SECTION 2: Desk Table Arena (with visual preview images) -->
         <div class="menu-section">
-            <div class="menu-label">Match Type</div>
-            <div class="pill-row" id="matchRow">
-                <button class="pill pill-green active" data-group="match" data-val="0" onclick="selectPill(this)">vs AI Bot</button>
-                <button class="pill pill-green" data-group="match" data-val="1" onclick="selectPill(this)">Local 2-Player</button>
-                <button class="pill pill-green" data-group="match" data-val="2" onclick="selectPill(this)">Online Multiplayer</button>
+            <div class="menu-label">2. School Desk Arena</div>
+            <div class="visual-card-grid" id="tableGrid">
+                <div class="visual-card active" data-group="table" data-val="1" onclick="selectVisualCard(this)">
+                    <div class="card-check">✓</div>
+                    <img src="assets/preview_table_barrier.png" alt="Front Groove Barrier">
+                    <div class="visual-card-body">
+                        <div class="visual-card-title">Groove Barrier</div>
+                        <div class="visual-card-desc">Front backboard barrier prevents top drop.</div>
+                    </div>
+                </div>
+
+                <div class="visual-card" data-group="table" data-val="0" onclick="selectVisualCard(this)">
+                    <div class="card-check">✓</div>
+                    <img src="assets/preview_table_open.png" alt="Open Wood Desk">
+                    <div class="visual-card-body">
+                        <div class="visual-card-title">Open Wood Desk</div>
+                        <div class="visual-card-desc">Zero safety rails. Lethal drop on all 4 edges!</div>
+                    </div>
+                </div>
+
+                <div class="visual-card" data-group="table" data-val="2" onclick="selectVisualCard(this)">
+                    <div class="card-check">✓</div>
+                    <img src="assets/preview_table_rails.png" alt="Dual Edge Rails">
+                    <div class="visual-card-body">
+                        <div class="visual-card-title">Dual Edge Rails</div>
+                        <div class="visual-card-desc">Protective fences for bank shots and ricochets.</div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- SECTION 3A: AI Difficulty (only when "vs AI" is chosen) -->
+        <!-- SECTION 3: Pen Starting Orientation (with visual preview images) -->
+        <div class="menu-section">
+            <div class="menu-label">3. Pen Starting Orientation</div>
+            <div class="visual-card-grid" id="stageGrid">
+                <div class="visual-card active" data-group="stage" data-val="0" onclick="selectVisualCard(this)">
+                    <div class="card-check">✓</div>
+                    <img src="assets/preview_stage_vertical.png" alt="Vertical Upright">
+                    <div class="visual-card-body">
+                        <div class="visual-card-title">Vertical Upright</div>
+                        <div class="visual-card-desc">Broadside exposed for powerful sweeps & hits.</div>
+                    </div>
+                </div>
+
+                <div class="visual-card" data-group="stage" data-val="1" onclick="selectVisualCard(this)">
+                    <div class="card-check">✓</div>
+                    <img src="assets/preview_stage_horizontal.png" alt="Horizontal Facing">
+                    <div class="visual-card-body">
+                        <div class="visual-card-title">Horizontal Facing</div>
+                        <div class="visual-card-desc">Defensive slim profile facing your opponent.</div>
+                    </div>
+                </div>
+
+                <div class="visual-card" data-group="stage" data-val="2" onclick="selectVisualCard(this)">
+                    <div class="card-check">✓</div>
+                    <img src="assets/preview_stage_cross.png" alt="Gauntlet Cross">
+                    <div class="visual-card-body">
+                        <div class="visual-card-title">Gauntlet Cross</div>
+                        <div class="visual-card-desc">Cross-axis clash with asymmetric tactical angles.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: Match Type -->
+        <div class="menu-section">
+            <div class="menu-label">4. Match Type</div>
+            <div class="ink-pill-row" id="matchRow">
+                <button class="ink-pill active" data-group="match" data-val="0" onclick="selectInkPill(this)">vs AI Bot</button>
+                <button class="ink-pill" data-group="match" data-val="1" onclick="selectInkPill(this)">Local 2-Player (Pass & Play)</button>
+                <button class="ink-pill" data-group="match" data-val="2" onclick="selectInkPill(this)">Online Multiplayer (WebRTC)</button>
+            </div>
+        </div>
+
+        <!-- SECTION 5A: AI Difficulty (only when "vs AI" is chosen) -->
         <div class="menu-section" id="aiSection">
             <div class="menu-label">AI Difficulty</div>
-            <div class="pill-row">
-                <button class="pill pill-red" data-group="diff" data-val="0" onclick="selectPill(this)">Freshman</button>
-                <button class="pill pill-red active" data-group="diff" data-val="1" onclick="selectPill(this)">Desk Mate</button>
-                <button class="pill pill-red" data-group="diff" data-val="2" onclick="selectPill(this)">Prefect</button>
-                <button class="pill pill-red" data-group="diff" data-val="3" onclick="selectPill(this)">Physics Prodigy</button>
+            <div class="ink-pill-row">
+                <button class="ink-pill" data-group="diff" data-val="0" onclick="selectInkPill(this)">Freshman</button>
+                <button class="ink-pill active" data-group="diff" data-val="1" onclick="selectInkPill(this)">Desk Mate</button>
+                <button class="ink-pill" data-group="diff" data-val="2" onclick="selectInkPill(this)">Prefect</button>
+                <button class="ink-pill" data-group="diff" data-val="3" onclick="selectInkPill(this)">Physics Prodigy</button>
             </div>
         </div>
 
-        <!-- SECTION 3B: Online Lobby (only when "Online Multiplayer" is chosen) -->
+        <!-- SECTION 5B: Online Lobby (only when "Online Multiplayer" is chosen) -->
         <div class="menu-section hidden" id="onlineSection">
-            <div class="menu-label">Online Lobby</div>
+            <div class="menu-label">Online Lobby & Pairing</div>
+
+            <!-- 2-Phone Pairing Tutorial GIF Banner -->
+            <div class="pairing-tutorial-box">
+                <img src="assets/pairing_tutorial.gif" alt="Phone Pairing Tutorial" class="pairing-gif">
+                <div class="pairing-tutorial-caption">
+                    <strong>Zero-Cost P2P Pairing:</strong> Phone 1 creates a room code &nbsp;➔&nbsp; Phone 2 types the code &nbsp;➔&nbsp; <strong>Connected instantly!</strong>
+                </div>
+            </div>
+
             <div class="online-tabs">
-                <button class="online-tab active" id="tabHost" onclick="switchOnlineTab('host')">Host a Desk</button>
-                <button class="online-tab" id="tabJoin" onclick="switchOnlineTab('join')">Join a Desk</button>
+                <button class="online-tab active" id="tabHost" onclick="switchOnlineTab('host')">Host Desk</button>
+                <button class="online-tab" id="tabJoin" onclick="switchOnlineTab('join')">Join Desk</button>
             </div>
 
             <!-- HOST panel -->
@@ -101,12 +199,16 @@
                 </div>
                 <div class="host-row">
                     <div id="qrContainer" class="qr-box">
-                        <div class="qr-placeholder">QR code will appear here once code is ready</div>
+                        <div class="qr-placeholder">Generating QR code...</div>
                     </div>
                     <div class="host-actions">
-                        <button class="action-btn btn-copy" onclick="menuCopyLink()">Copy Invite Link</button>
-                        <button class="action-btn btn-tweet" onclick="menuTweet()">Post on X / Twitter</button>
-                        <div id="connectionBadge" class="conn-badge waiting">Waiting for opponent...</div>
+                        <button class="btn-ink-action" onclick="menuCopyLink()">
+                            📋 Copy Room Invite Link
+                        </button>
+                        <button class="btn-ink-action" onclick="menuTweet()">
+                            ⚡ Challenge on X / Twitter
+                        </button>
+                        <div id="connectionBadge" class="conn-badge waiting">Waiting for opponent to connect...</div>
                     </div>
                 </div>
             </div>
@@ -114,47 +216,54 @@
             <!-- JOIN panel -->
             <div id="joinPanel" class="online-panel hidden">
                 <div class="join-form">
-                    <label class="join-label" for="joinCodeInput">Enter Room Code</label>
+                    <label class="join-label" for="joinCodeInput">Enter Friend's 5-Letter Room Code</label>
                     <input id="joinCodeInput" class="join-input" type="text"
                            maxlength="5" placeholder="e.g. PEN82"
                            autocomplete="off" autocorrect="off" spellcheck="false"
                            oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
-                    <button class="action-btn btn-copy" style="margin-top:10px;" onclick="menuJoinRoom()">Join Desk</button>
+                    <button class="btn-ink-action" style="margin-top:10px;" onclick="menuJoinRoom()">
+                        Connect to Desk
+                    </button>
                     <div id="joinStatus" class="conn-badge waiting hidden">Connecting...</div>
                 </div>
             </div>
         </div>
 
-        <!-- SECTION 4: Controls Scheme (Desktop PC Mouse vs Mobile Touch Swipe) -->
+        <!-- SECTION 6: Controls Scheme (Desktop PC Mouse vs Mobile Touch Swipe) -->
         <div class="menu-section">
             <div class="menu-label">Control Method</div>
-            <div class="pill-row" id="ctrlRow">
-                <button class="pill pill-blue active" id="btnCtrlMouse" data-group="ctrl" data-val="0" onclick="selectPill(this)">🖱️ PC Mouse (Aim & Charge)</button>
-                <button class="pill pill-blue" id="btnCtrlTouch" data-group="ctrl" data-val="1" onclick="selectPill(this)">📱 Mobile (Swipe to Flick)</button>
+            <div class="ink-pill-row" id="ctrlRow">
+                <button class="ink-pill active" id="btnCtrlMouse" data-group="ctrl" data-val="0" onclick="selectInkPill(this)">🖱️ PC Mouse (Aim & Charge)</button>
+                <button class="ink-pill" id="btnCtrlTouch" data-group="ctrl" data-val="1" onclick="selectInkPill(this)">📱 Mobile (Swipe to Flick)</button>
             </div>
         </div>
 
         <div class="menu-divider"></div>
 
-        <!-- START BUTTON -->
+        <!-- START / RESUME BUTTON ROW -->
         <div class="menu-start-row">
-            <div id="wasmStatus" class="wasm-status">Loading physics engine...</div>
-            <button class="start-btn" id="startBtn" onclick="launchGame()" disabled>
-                Enter Classroom
-            </button>
+            <div id="wasmStatus" class="wasm-status">Loading Box2D v3 physics engine...</div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; width:100%;">
+                <button class="start-btn" id="startBtn" onclick="launchGame(false)" disabled>
+                    Enter Classroom  ▶
+                </button>
+                <button class="secondary-btn hidden" id="resetMatchBtn" onclick="launchGame(true)">
+                    Start Fresh Match 🔄
+                </button>
+            </div>
         </div>
 
         <!-- Footer note -->
         <div class="menu-footer">
-            100% Free &nbsp;·&nbsp; No servers &nbsp;·&nbsp; P2P WebRTC &nbsp;·&nbsp;
-            <a href="https://github.com/TherealE2O/birogame" target="_blank" rel="noopener">GitHub</a>
+            100% Free P2P &nbsp;·&nbsp; Box2D v3.2.0 &nbsp;·&nbsp;
+            <a href="https://github.com/TherealE2O/birogame" target="_blank" rel="noopener">GitHub Project</a>
         </div>
 
     </div>
 </div>
 
 <!-- ============================================================ -->
-<!--  GAME CANVAS AREA (hidden until menu dismissed)              -->
+<!--  GAME CANVAS AREA                                            -->
 <!-- ============================================================ -->
 <div id="gameArea" class="game-area hidden">
     <header class="classroom-header">
@@ -163,10 +272,10 @@
             <span class="brand-subtitle">School Desk Physics</span>
         </div>
         <div class="header-badges">
-            <span class="badge badge-box2d">Box2D v3.2.0 + Raylib 6.0</span>
-            <span class="badge badge-free">100% Free P2P ($0.00)</span>
-            <button class="badge badge-github" onclick="window.copyRoomLink()">Copy Room</button>
-            <button class="badge badge-github" onclick="window.tweetChallenge()">Tweet Link</button>
+            <button class="badge badge-menu" onclick="window.toggleNotebookMenu()">⏸ MENU</button>
+            <span class="badge badge-box2d">Box2D v3.2.0</span>
+            <button class="badge badge-action" onclick="window.copyRoomLink()">📋 Copy Room</button>
+            <button class="badge badge-action" onclick="window.tweetChallenge()">⚡ Tweet Link</button>
         </div>
     </header>
 
@@ -191,19 +300,15 @@
     <footer class="action-tray">
         <div class="tray-shortcuts">
             <span>Controls:</span>
-            <span><span class="kbd">CLICK / TOUCH</span> Aim + Charge</span>
-            <span><span class="kbd">TAB</span> Arena</span>
-            <span><span class="kbd">M</span> Mode</span>
-            <span><span class="kbd">S</span> Axis</span>
-            <span><span class="kbd">O</span> Online</span>
-            <span><span class="kbd">I</span> AI Bot</span>
-            <span><span class="kbd">P</span> Market</span>
-            <span><span class="kbd">R</span> Reset</span>
+            <span><span class="kbd">CLICK / TOUCH</span> Aim & Flick</span>
+            <span><span class="kbd">ESC / M</span> Pause Menu</span>
+            <span><span class="kbd">R</span> Reset Round</span>
         </div>
         <div class="tray-buttons">
-            <button class="btn-tray btn-copy" onclick="window.copyRoomLink()">Copy Invite Link</button>
-            <button class="btn-tray btn-twitter" onclick="window.tweetChallenge()">&#x1D54F; Challenge on X</button>
-            <button class="btn-tray btn-fullscreen" onclick="window.toggleGameFullscreen()">&#x26F6; Fullscreen</button>
+            <button class="btn-tray" onclick="window.toggleNotebookMenu()">⏸ Menu</button>
+            <button class="btn-tray" onclick="window.copyRoomLink()">📋 Copy Invite</button>
+            <button class="btn-tray" onclick="window.tweetChallenge()">⚡ Tweet on X</button>
+            <button class="btn-tray" onclick="window.toggleGameFullscreen()">⛶ Fullscreen</button>
         </div>
     </footer>
 </div>
@@ -292,12 +397,16 @@ var isMobileDevice = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.
 
 var menuSel = {
     mode:        0,   // 0=1v1  1=2v2  2=Royale
+    table:       1,   // 0=Open 1=Barrier 2=Rails
+    stage:       0,   // 0=Vertical 1=Horizontal 2=Cross
     matchType:   0,   // 0=AI   1=Local  2=Online
     aiDiff:      1,   // 0-3
     controlMode: isMobileDevice ? 1 : 0, // 0=PC Mouse, 1=Mobile Touch
     onlineRole:  'host',
-    joinCode:    ''
+    joinCode:    '',
+    hasLaunched: false
 };
+window.menuSel = menuSel;
 
 if (isMobileDevice) {
     var bM = document.getElementById('btnCtrlMouse');
@@ -308,27 +417,52 @@ if (isMobileDevice) {
     }
 }
 
-function selectPill(btn) {
+function selectVisualCard(card) {
+    var group = card.dataset.group;
+    var val   = parseInt(card.dataset.val, 10);
+
+    document.querySelectorAll('.visual-card[data-group="' + group + '"]').forEach(function(c) {
+        c.classList.remove('active');
+    });
+    card.classList.add('active');
+
+    if (group === 'mode')  { menuSel.mode  = val; }
+    if (group === 'table') { menuSel.table = val; }
+    if (group === 'stage') { menuSel.stage = val; }
+
+    // If game has already launched, apply live changes
+    if (menuSel.hasLaunched && window.Module) {
+        if (group === 'mode'  && Module._SetGameMode)  Module._SetGameMode(val);
+        if (group === 'table' && Module._SetTableType) Module._SetTableType(val);
+        if (group === 'stage' && Module._SetStageAxis) Module._SetStageAxis(val);
+    }
+}
+
+function selectInkPill(btn) {
     var group = btn.dataset.group;
     var val   = parseInt(btn.dataset.val, 10);
 
-    // deselect siblings
-    document.querySelectorAll('[data-group="' + group + '"]').forEach(function(b) {
+    document.querySelectorAll('.ink-pill[data-group="' + group + '"]').forEach(function(b) {
         b.classList.remove('active');
     });
     btn.classList.add('active');
 
-    if (group === 'mode')  { menuSel.mode        = val; }
     if (group === 'match') { menuSel.matchType   = val; onMatchTypeChange(val); }
     if (group === 'diff')  { menuSel.aiDiff      = val; }
     if (group === 'ctrl')  { menuSel.controlMode = val; }
+
+    if (menuSel.hasLaunched && window.Module) {
+        if (group === 'match' && Module._SetMatchMode)    Module._SetMatchMode(val);
+        if (group === 'diff'  && Module._SetAIDifficulty) Module._SetAIDifficulty(val);
+        if (group === 'ctrl'  && Module._SetTouchControlMode) Module._SetTouchControlMode(val);
+    }
 }
 
 function onMatchTypeChange(val) {
-    document.getElementById('aiSection').classList.toggle('hidden',   val !== 0);
+    document.getElementById('aiSection').classList.toggle('hidden',     val !== 0);
     document.getElementById('onlineSection').classList.toggle('hidden', val !== 2);
-    if (val === 2) {
-        window.menuInitHost();   // start generating room code immediately
+    if (val === 2 && typeof window.menuInitHost === 'function') {
+        window.menuInitHost();
     }
 }
 
@@ -341,18 +475,18 @@ function switchOnlineTab(tab) {
 }
 
 function menuCopyLink() {
-    var url = window.menuGetShareUrl();
+    var url = window.menuGetShareUrl ? window.menuGetShareUrl() : window.location.href;
     navigator.clipboard.writeText(url).then(function() {
-        showMenuToast('Invite link copied!');
+        showMenuToast('📋 Desk invite link copied to clipboard!');
     }).catch(function() {
-        prompt('Copy this link:', url);
+        prompt('Copy this desk invite link:', url);
     });
 }
 
 function menuTweet() {
-    var url  = window.menuGetShareUrl();
-    var text = 'Think your biro skills are elite? Play me in BIRO CLASH on a school desk right now!\n\n' + url + '\n\n#BiroClash #Box2D #WebAssembly';
-    window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
+    if (typeof window.tweetChallenge === 'function') {
+        window.tweetChallenge();
+    }
 }
 
 function menuJoinRoom() {
@@ -361,7 +495,9 @@ function menuJoinRoom() {
     menuSel.joinCode = code;
     document.getElementById('joinStatus').classList.remove('hidden');
     document.getElementById('joinStatus').textContent = 'Connecting to desk ' + code + '...';
-    window.menuConnectAsGuest(code);
+    if (typeof window.menuConnectAsGuest === 'function') {
+        window.menuConnectAsGuest(code);
+    }
 }
 
 function showMenuToast(msg) {
@@ -369,52 +505,70 @@ function showMenuToast(msg) {
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(el._t);
-    el._t = setTimeout(function() { el.classList.remove('show'); }, 3000);
+    el._t = setTimeout(function() { el.classList.remove('show'); }, 3500);
 }
 
 /* ----------------------------------------------------------------
-   Launch: hide menu, show game area, apply settings to WASM
+   Launch / Resume: hide menu, show game area, apply settings
 ---------------------------------------------------------------- */
-function launchGame() {
-    // If online + join mode but no code entered yet, bail
+function launchGame(isFreshStart) {
     if (menuSel.matchType === 2 && menuSel.onlineRole === 'join') {
         var code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
         if (code.length < 2) { showMenuToast('Enter a valid room code first'); return; }
         menuSel.joinCode = code;
     }
 
+    menuSel.hasLaunched = true;
     document.getElementById('mainMenu').classList.add('hidden');
     document.getElementById('gameArea').classList.remove('hidden');
 
-    // If WASM not ready yet, show loading screen; settings applied in onWasmInitialized callback
+    // Show secondary reset button next time menu is opened
+    document.getElementById('resetMatchBtn').classList.remove('hidden');
+    document.getElementById('startBtn').textContent = 'Resume Match  ▶';
+
     if (!window.Module || !Module._SetMatchMode) {
         document.getElementById('loadingOverlay').classList.remove('hidden');
     }
 
-    window.applyMenuSettings();
+    if (window.Module) {
+        if (Module._SetGamePaused) Module._SetGamePaused(0);
+        if (isFreshStart && Module._ResetFullMatch) Module._ResetFullMatch();
+    }
+
+    if (typeof window.applyMenuSettings === 'function') {
+        window.applyMenuSettings();
+    }
 }
 
 /* ----------------------------------------------------------------
-   URL room-code auto-join (someone clicked an invite link)
+   URL room-code auto-join (direct invite link)
 ---------------------------------------------------------------- */
 (function() {
     var params = new URLSearchParams(window.location.search);
     var room   = params.get('room');
     if (room && room.trim().length > 0) {
-        // Pre-fill the join form and auto-switch to Online > Join
         menuSel.matchType  = 2;
         menuSel.onlineRole = 'join';
         menuSel.joinCode   = room.trim().toUpperCase();
 
-        // Activate the correct pills
-        document.querySelectorAll('[data-group="match"]').forEach(function(b) { b.classList.remove('active'); });
-        document.querySelector('[data-group="match"][data-val="2"]').classList.add('active');
+        document.querySelectorAll('.ink-pill[data-group="match"]').forEach(function(b) { b.classList.remove('active'); });
+        var onlineBtn = document.querySelector('.ink-pill[data-group="match"][data-val="2"]');
+        if (onlineBtn) onlineBtn.classList.add('active');
         document.getElementById('aiSection').classList.add('hidden');
         document.getElementById('onlineSection').classList.remove('hidden');
         switchOnlineTab('join');
         document.getElementById('joinCodeInput').value = menuSel.joinCode;
         document.getElementById('joinStatus').classList.remove('hidden');
         document.getElementById('joinStatus').textContent = 'Ready to join desk ' + menuSel.joinCode;
+    } else if (params.get('host')) {
+        menuSel.matchType  = 2;
+        menuSel.onlineRole = 'host';
+        document.querySelectorAll('.ink-pill[data-group="match"]').forEach(function(b) { b.classList.remove('active'); });
+        var onlineBtn = document.querySelector('.ink-pill[data-group="match"][data-val="2"]');
+        if (onlineBtn) onlineBtn.classList.add('active');
+        document.getElementById('aiSection').classList.add('hidden');
+        document.getElementById('onlineSection').classList.remove('hidden');
+        switchOnlineTab('host');
     }
 })();
 </script>
