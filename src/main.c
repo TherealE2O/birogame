@@ -451,6 +451,8 @@ typedef struct {
     int marketSelectedPlayer;
     int activePlayer;
     int roundNumber;
+    int roundStartingPlayer;
+    bool isFirstMoveOfRound;
     const char* roundOutcomeMsg;
 
     int teamBlueScore;
@@ -1484,13 +1486,16 @@ static void DrawHUD(void) {
         bool isRemoteTurn = (matchType == MATCH_ONLINE_P2P && activePlayer != g_game.onlineLocalPlayerIndex);
 
         if (isAiTurn) {
-            DrawSchoolTextTitle(TextFormat("%s (AI BOT)", biros[activePlayer].shortName), (float)bannerRect.x + 6, (float)bannerRect.y + 4, 14, pCols[activePlayer]);
+            const char* title = g_game.isFirstMoveOfRound ? TextFormat("%s (1ST MOVE)", biros[activePlayer].shortName) : TextFormat("%s (AI BOT)", biros[activePlayer].shortName);
+            DrawSchoolTextTitle(title, (float)bannerRect.x + 6, (float)bannerRect.y + 4, 14, pCols[activePlayer]);
             DrawSchoolText("CALCULATING FLICK...", (float)bannerRect.x + 6, (float)bannerRect.y + 24, 12, (Color){ 180, 110, 30, 255 });
         } else if (isRemoteTurn) {
-            DrawSchoolTextTitle(TextFormat("%s (REMOTE)", biros[activePlayer].shortName), (float)bannerRect.x + 6, (float)bannerRect.y + 4, 14, pCols[activePlayer]);
+            const char* title = g_game.isFirstMoveOfRound ? TextFormat("%s (1ST MOVE)", biros[activePlayer].shortName) : TextFormat("%s (REMOTE)", biros[activePlayer].shortName);
+            DrawSchoolTextTitle(title, (float)bannerRect.x + 6, (float)bannerRect.y + 4, 14, pCols[activePlayer]);
             DrawSchoolText("OPPONENT AIMING...", (float)bannerRect.x + 6, (float)bannerRect.y + 24, 12, (Color){ 180, 110, 30, 255 });
         } else {
-            DrawSchoolTextTitle(TextFormat("%s TO STRIKE", biros[activePlayer].shortName), (float)bannerRect.x + 6, (float)bannerRect.y + 4, 15, pCols[activePlayer]);
+            const char* title = g_game.isFirstMoveOfRound ? TextFormat("%s (YOUR 1ST MOVE!)", biros[activePlayer].shortName) : TextFormat("%s TO STRIKE", biros[activePlayer].shortName);
+            DrawSchoolTextTitle(title, (float)bannerRect.x + 6, (float)bannerRect.y + 4, 15, pCols[activePlayer]);
             const PenModelDef* def = &g_penModels[biros[activePlayer].modelId];
             float mass = b2Body_GetMass(biros[activePlayer].bodyId);
             DrawSchoolText(TextFormat("[%s | %.2fkg]", def->name, mass), (float)bannerRect.x + 6, (float)bannerRect.y + 24, 12, (Color){ 60, 65, 75, 255 });
@@ -1657,8 +1662,26 @@ static int GetNextActivePlayer(int current, const Biro biros[4], int numPlayers)
     return current;
 }
 
-static void ResetTurnToPlayer0(void) {
-    g_game.activePlayer = 0;
+// Determine which player takes the opening strike of the round (strictly alternating across rounds!)
+static int GetRoundStartingPlayer(int roundNumber, GameMode mode) {
+    int numP = (mode == MODE_1V1) ? 2 : 4;
+    int starter = (roundNumber - 1) % numP;
+    if (starter < 0) starter = 0;
+    return starter;
+}
+
+// Reset turn state for the beginning of a round, giving the first move to the alternating starter
+static void ResetTurnForRound(int roundNumber) {
+    int numP = (g_game.currentGameMode == MODE_1V1) ? 2 : 4;
+    int startingPlayer = GetRoundStartingPlayer(roundNumber, g_game.currentGameMode);
+
+    if (g_game.biros[startingPlayer].isEliminated) {
+        startingPlayer = GetNextActivePlayer(startingPlayer, g_game.biros, numP);
+    }
+
+    g_game.roundStartingPlayer = startingPlayer;
+    g_game.isFirstMoveOfRound = true;
+    g_game.activePlayer = startingPlayer;
     g_game.turnTimer = TURN_TIME_LIMIT;
     g_game.isCharging = false;
     g_game.state = STATE_AIMING;
@@ -1673,7 +1696,7 @@ static void ResetMatchScoresAndBiros(void) {
     for (int i = 0; i < 4; i++) g_game.biros[i].score = 0;
     g_game.roundNumber = 1;
     ResetAllBirosForModeAndStage(g_game.biros, g_game.currentGameMode, g_game.currentStage);
-    ResetTurnToPlayer0();
+    ResetTurnForRound(g_game.roundNumber);
 }
 
 // Calculate AI Bot physics targeting, contact point and power
@@ -1907,6 +1930,7 @@ static void ExecuteFlickStrike(int playerIndex, b2Vec2 strikeLocalPoint, float a
     g_game.turnTimer = TURN_TIME_LIMIT;
     g_game.lastTickSecond = -1;
     g_game.isCharging = false;
+    g_game.isFirstMoveOfRound = false;
     g_game.state = STATE_SIMULATING;
 
     // Transmit over WebRTC if this was our local turn in Online mode
@@ -2307,7 +2331,7 @@ static void UpdateDrawFrame(void) {
                     } else if (i == 1) {
                         // 2. Restart Round
                         ResetAllBirosForModeAndStage(g_game.biros, g_game.currentGameMode, g_game.currentStage);
-                        ResetTurnToPlayer0();
+                        ResetTurnForRound(g_game.roundNumber);
                         g_game.isPausedMenuOpen = false;
                     } else if (i == 2) {
                         // 3. Desk Setup / Lobby
@@ -2792,7 +2816,7 @@ static void UpdateDrawFrame(void) {
             if (IsKeyPressed(KEY_SPACE) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !g_game.showOnlineModal)) {
                 g_game.roundNumber++;
                 ResetAllBirosForModeAndStage(g_game.biros, g_game.currentGameMode, g_game.currentStage);
-                ResetTurnToPlayer0();
+                ResetTurnForRound(g_game.roundNumber);
             }
             break;
         }
@@ -2821,6 +2845,17 @@ static void UpdateDrawFrame(void) {
 
     // 1. Draw School Table Desk
     DrawSchoolDesk(g_game.deskRect, g_game.currentTableType);
+
+    // 1b. Opening Break Desk Notification (Telegraphs Alternating First Move)
+    if (g_game.state == STATE_AIMING && g_game.isFirstMoveOfRound) {
+        int starter = g_game.roundStartingPlayer;
+        const char* note = TextFormat("[ ROUND %d OPENING MOVE: %s STRIKES FIRST ]", g_game.roundNumber, g_game.biros[starter].playerName);
+        float tw = MeasureSchoolTextTitle(note, 13);
+        Rectangle noteBox = { TABLE_CENTER_X - tw * 0.5f - 14, g_game.deskRect.y + 14.0f, tw + 28, 24 };
+        DrawRectangleRounded(noteBox, 0.35f, 4, (Color){ 24, 20, 16, 215 });
+        DrawRectangleRoundedLines(noteBox, 0.35f, 4, (Color){ 235, 205, 130, 220 });
+        DrawSchoolTextTitle(note, noteBox.x + 14, noteBox.y + 4, 13, (Color){ 250, 238, 210, 255 });
+    }
 
     // 2. Active Pen Subtle Aura
     if (g_game.state == STATE_AIMING && !currentBiro->isEliminated) {
@@ -3042,27 +3077,35 @@ static void UpdateDrawFrame(void) {
     if (g_game.state == STATE_ROUND_OVER) {
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){ 12, 16, 14, 185 });
 
-        Rectangle modal = { SCREEN_WIDTH * 0.5f - 270, SCREEN_HEIGHT * 0.5f - 110, 540, 220 };
+        Rectangle modal = { SCREEN_WIDTH * 0.5f - 270, SCREEN_HEIGHT * 0.5f - 118, 540, 236 };
         DrawRectangleRounded(modal, 0.04f, 6, (Color){ 250, 246, 236, 255 });
         DrawRectangleRoundedLines(modal, 0.04f, 6, (Color){ 195, 34, 42, 255 });
         DrawRectangleLines((int)modal.x + 3, (int)modal.y + 3, (int)modal.width - 6, (int)modal.height - 6, (Color){ 195, 34, 42, 180 });
 
-        DrawSchoolTextTitle("RECESS BELL: ROUND FINISHED!", modal.x + 95, modal.y + 20, 24, (Color){ 195, 34, 42, 255 });
-        DrawSchoolText(g_game.roundOutcomeMsg, modal.x + 40, modal.y + 68, 17, (Color){ 30, 35, 45, 255 });
+        DrawSchoolTextTitle("RECESS BELL: ROUND FINISHED!", modal.x + 95, modal.y + 18, 22, (Color){ 195, 34, 42, 255 });
+        DrawSchoolText(g_game.roundOutcomeMsg, modal.x + 40, modal.y + 58, 16, (Color){ 30, 35, 45, 255 });
 
         if (g_game.currentGameMode == MODE_1V1) {
             DrawSchoolTextTitle(TextFormat("MATCH SCORE:  BLUE [%d]  -  [%d] RED", g_game.biros[0].score, g_game.biros[1].score),
-                                modal.x + 105, modal.y + 115, 18, (Color){ 22, 60, 160, 255 });
+                                modal.x + 105, modal.y + 98, 18, (Color){ 22, 60, 160, 255 });
         } else if (g_game.currentGameMode == MODE_TEAMS_2V2) {
             DrawSchoolTextTitle(TextFormat("TEAM SCORE:  BLUE [%d]  -  [%d] RED", g_game.teamBlueScore, g_game.teamRedScore),
-                                modal.x + 115, modal.y + 115, 18, (Color){ 22, 60, 160, 255 });
+                                modal.x + 115, modal.y + 98, 18, (Color){ 22, 60, 160, 255 });
         } else {
             DrawSchoolTextTitle(TextFormat("SCORES:  P1:%d  P2:%d  P3:%d  P4:%d",
                                            g_game.biros[0].score, g_game.biros[1].score, g_game.biros[2].score, g_game.biros[3].score),
-                                modal.x + 110, modal.y + 115, 18, (Color){ 22, 60, 160, 255 });
+                                modal.x + 110, modal.y + 98, 18, (Color){ 22, 60, 160, 255 });
         }
 
-        DrawSchoolText("PRESS [SPACE] OR CLICK TO RESUME MATCH", modal.x + 115, modal.y + 168, 15, (Color){ 195, 34, 42, 255 });
+        int nextStarter = GetRoundStartingPlayer(g_game.roundNumber + 1, g_game.currentGameMode);
+        const char* nextStarterName = g_game.biros[nextStarter].playerName;
+        Color pStarterCols[4] = { (Color){ 22, 65, 160, 255 }, (Color){ 210, 35, 45, 255 }, (Color){ 25, 135, 65, 255 }, (Color){ 45, 45, 50, 255 } };
+
+        const char* nextInfo = TextFormat("NEXT ROUND: %s TAKES THE FIRST MOVE!", nextStarterName);
+        float ntw = MeasureSchoolTextTitle(nextInfo, 15);
+        DrawSchoolTextTitle(nextInfo, modal.x + modal.width * 0.5f - ntw * 0.5f, modal.y + 138, 15, pStarterCols[nextStarter]);
+
+        DrawSchoolText("PRESS [SPACE] OR CLICK TO START NEXT ROUND", modal.x + 105, modal.y + 180, 14, (Color){ 195, 34, 42, 255 });
     } else if (g_game.state == STATE_MATCH_OVER) {
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){ 12, 16, 14, 210 });
 
@@ -3203,7 +3246,7 @@ EMSCRIPTEN_EXPORT void RestartMatchFromNetwork(int mode, int stage, int table) {
     g_game.currentTableType = (TableType)(table % 3);
     SetupTableColliders(g_game.worldId, g_game.currentTableType, &g_game.topBarrierBody, &g_game.bottomBarrierBody);
     ResetAllBirosForModeAndStage(g_game.biros, g_game.currentGameMode, g_game.currentStage);
-    ResetTurnToPlayer0();
+    ResetTurnForRound(g_game.roundNumber);
 }
 
 EMSCRIPTEN_EXPORT int GetGameActivePlayer(void) {
@@ -3234,7 +3277,7 @@ EMSCRIPTEN_EXPORT void SetGamePaused(int paused) {
 
 EMSCRIPTEN_EXPORT void RestartCurrentRound(void) {
     ResetAllBirosForModeAndStage(g_game.biros, g_game.currentGameMode, g_game.currentStage);
-    ResetTurnToPlayer0();
+    ResetTurnForRound(g_game.roundNumber);
 }
 
 EMSCRIPTEN_EXPORT void ResetFullMatch(void) {
@@ -3276,6 +3319,8 @@ int main(int argc, char** argv) {
             g_game.isPausedMenuOpen = true;
         } else if (strcmp(argv[i], "--market") == 0) {
             g_game.startInMarket = true;
+        } else if (strcmp(argv[i], "--round") == 0 && i + 1 < argc) {
+            g_game.roundNumber = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--p1-model") == 0 && i + 1 < argc) {
             customP1Model = atoi(argv[++i]) % NUM_PEN_MODELS;
         } else if (strcmp(argv[i], "--p2-model") == 0 && i + 1 < argc) {
@@ -3319,9 +3364,9 @@ int main(int argc, char** argv) {
 
     ResetAllBirosForModeAndStage(g_game.biros, g_game.currentGameMode, g_game.currentStage);
 
-    g_game.state = g_game.startInMarket ? STATE_PEN_MARKET : STATE_AIMING;
-    g_game.activePlayer = 0;
-    g_game.roundNumber = 1;
+    if (g_game.roundNumber <= 0) g_game.roundNumber = 1;
+    ResetTurnForRound(g_game.roundNumber);
+    if (g_game.startInMarket) g_game.state = STATE_PEN_MARKET;
     g_game.roundOutcomeMsg = "";
 
 #if defined(PLATFORM_WEB)
