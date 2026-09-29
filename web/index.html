@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BIRO CLASH - School Desk Physics | Box2D v3</title>
 
     <!-- Rich social cards -->
@@ -48,21 +48,21 @@
         <!-- Title Block -->
         <div class="menu-title-block">
             <div class="menu-title">BIRO CLASH</div>
-            <div class="menu-subtitle">Classroom Desk Physics &nbsp;·&nbsp; Box2D v3 + Raylib WebAssembly</div>
+            <div class="menu-subtitle">Classroom Desk Physics &nbsp;·&nbsp; Box2D v3 + Raylib</div>
         </div>
 
         <div class="menu-divider"></div>
 
         <!-- SECTION 1: Game Mode (with visual preview images) -->
         <div class="menu-section">
-            <div class="menu-label">1. Choose Game Mode</div>
+            <div class="menu-label">1. Game Mode</div>
             <div class="visual-card-grid" id="modeGrid">
                 <div class="visual-card active" data-group="mode" data-val="0" onclick="selectVisualCard(this)">
                     <div class="card-check">✓</div>
                     <img src="assets/preview_mode_1v1.png" alt="1v1 Classic Duel">
                     <div class="visual-card-body">
                         <div class="visual-card-title">1v1 Classic Duel</div>
-                        <div class="visual-card-desc">2 pens facing off head-to-head on the desk.</div>
+                        <div class="visual-card-desc">2 pens facing off head-to-head.</div>
                     </div>
                 </div>
 
@@ -71,7 +71,7 @@
                     <img src="assets/preview_mode_2v2.png" alt="2v2 Team Clash">
                     <div class="visual-card-body">
                         <div class="visual-card-title">2v2 Team Battle</div>
-                        <div class="visual-card-desc">Blue pair vs Red pair with partner collisions.</div>
+                        <div class="visual-card-desc">Blue pair vs Red pair battle.</div>
                     </div>
                 </div>
 
@@ -79,8 +79,8 @@
                     <div class="card-check">✓</div>
                     <img src="assets/preview_mode_royale.png" alt="Battle Royale FFA">
                     <div class="visual-card-body">
-                        <div class="visual-card-title">Battle Royale FFA</div>
-                        <div class="visual-card-desc">4 players in 4 corners. Last pen standing wins!</div>
+                        <div class="visual-card-title">Battle Royale</div>
+                        <div class="visual-card-desc">4 players. Last pen standing!</div>
                     </div>
                 </div>
             </div>
@@ -88,14 +88,14 @@
 
         <!-- SECTION 2: Desk Table Arena (with visual preview images) -->
         <div class="menu-section">
-            <div class="menu-label">2. School Desk Arena</div>
+            <div class="menu-label">2. Desk Arena</div>
             <div class="visual-card-grid" id="tableGrid">
                 <div class="visual-card active" data-group="table" data-val="1" onclick="selectVisualCard(this)">
                     <div class="card-check">✓</div>
                     <img src="assets/preview_table_barrier.png" alt="Front Groove Barrier">
                     <div class="visual-card-body">
                         <div class="visual-card-title">Groove Barrier</div>
-                        <div class="visual-card-desc">Front backboard barrier prevents top drop.</div>
+                        <div class="visual-card-desc">Backboard blocks top falloff.</div>
                     </div>
                 </div>
 
@@ -103,8 +103,8 @@
                     <div class="card-check">✓</div>
                     <img src="assets/preview_table_open.png" alt="Open Wood Desk">
                     <div class="visual-card-body">
-                        <div class="visual-card-title">Open Wood Desk</div>
-                        <div class="visual-card-desc">Zero safety rails. Lethal drop on all 4 edges!</div>
+                        <div class="visual-card-title">Open Desk</div>
+                        <div class="visual-card-desc">Lethal drop on all 4 edges!</div>
                     </div>
                 </div>
 
@@ -112,8 +112,8 @@
                     <div class="card-check">✓</div>
                     <img src="assets/preview_table_rails.png" alt="Dual Edge Rails">
                     <div class="visual-card-body">
-                        <div class="visual-card-title">Dual Edge Rails</div>
-                        <div class="visual-card-desc">Protective fences for bank shots and ricochets.</div>
+                        <div class="visual-card-title">Dual Rails</div>
+                        <div class="visual-card-desc">Side rails for bank shots.</div>
                     </div>
                 </div>
             </div>
@@ -121,14 +121,14 @@
 
         <!-- SECTION 3: Pen Starting Orientation (with visual preview images) -->
         <div class="menu-section">
-            <div class="menu-label">3. Pen Starting Orientation</div>
+            <div class="menu-label">3. Starting Orientation</div>
             <div class="visual-card-grid" id="stageGrid">
                 <div class="visual-card active" data-group="stage" data-val="0" onclick="selectVisualCard(this)">
                     <div class="card-check">✓</div>
                     <img src="assets/preview_stage_vertical.png" alt="Vertical Upright">
                     <div class="visual-card-body">
-                        <div class="visual-card-title">Vertical Upright</div>
-                        <div class="visual-card-desc">Broadside exposed for powerful sweeps & hits.</div>
+                        <div class="visual-card-title">Vertical</div>
+                        <div class="visual-card-desc">Broadside open for sweeps.</div>
                     </div>
                 </div>
 
@@ -136,8 +136,8 @@
                     <div class="card-check">✓</div>
                     <img src="assets/preview_stage_horizontal.png" alt="Horizontal Facing">
                     <div class="visual-card-body">
-                        <div class="visual-card-title">Horizontal Facing</div>
-                        <div class="visual-card-desc">Defensive slim profile facing your opponent.</div>
+                        <div class="visual-card-title">Horizontal</div>
+                        <div class="visual-card-desc">Slim head-to-head profile.</div>
                     </div>
                 </div>
 
@@ -146,7 +146,7 @@
                     <img src="assets/preview_stage_cross.png" alt="Gauntlet Cross">
                     <div class="visual-card-body">
                         <div class="visual-card-title">Gauntlet Cross</div>
-                        <div class="visual-card-desc">Cross-axis clash with asymmetric tactical angles.</div>
+                        <div class="visual-card-desc">Asymmetric angle clash.</div>
                     </div>
                 </div>
             </div>
@@ -157,8 +157,8 @@
             <div class="menu-label">4. Match Type</div>
             <div class="ink-pill-row" id="matchRow">
                 <button class="ink-pill active" data-group="match" data-val="0" onclick="selectInkPill(this)">vs AI Bot</button>
-                <button class="ink-pill" data-group="match" data-val="1" onclick="selectInkPill(this)">Local 2-Player (Pass & Play)</button>
-                <button class="ink-pill" data-group="match" data-val="2" onclick="selectInkPill(this)">Online Multiplayer (WebRTC)</button>
+                <button class="ink-pill" data-group="match" data-val="1" onclick="selectInkPill(this)">Local 2P</button>
+                <button class="ink-pill" data-group="match" data-val="2" onclick="selectInkPill(this)">Online P2P</button>
             </div>
         </div>
 
@@ -169,19 +169,19 @@
                 <button class="ink-pill" data-group="diff" data-val="0" onclick="selectInkPill(this)">Freshman</button>
                 <button class="ink-pill active" data-group="diff" data-val="1" onclick="selectInkPill(this)">Desk Mate</button>
                 <button class="ink-pill" data-group="diff" data-val="2" onclick="selectInkPill(this)">Prefect</button>
-                <button class="ink-pill" data-group="diff" data-val="3" onclick="selectInkPill(this)">Physics Prodigy</button>
+                <button class="ink-pill" data-group="diff" data-val="3" onclick="selectInkPill(this)">Prodigy</button>
             </div>
         </div>
 
         <!-- SECTION 5B: Online Lobby (only when "Online Multiplayer" is chosen) -->
         <div class="menu-section hidden" id="onlineSection">
-            <div class="menu-label">Online Lobby & Pairing</div>
+            <div class="menu-label">Online Lobby &amp; Sharing</div>
 
             <!-- 2-Phone Pairing Tutorial GIF Banner -->
             <div class="pairing-tutorial-box">
                 <img src="assets/pairing_tutorial.gif" alt="Phone Pairing Tutorial" class="pairing-gif">
                 <div class="pairing-tutorial-caption">
-                    <strong>Zero-Cost P2P Pairing:</strong> Phone 1 creates a room code &nbsp;➔&nbsp; Phone 2 types the code &nbsp;➔&nbsp; <strong>Connected instantly!</strong>
+                    <strong>P2P Pairing:</strong> Phone 1 creates room code &nbsp;➔&nbsp; Phone 2 enters code &nbsp;➔&nbsp; <strong>Connected!</strong>
                 </div>
             </div>
 
@@ -190,25 +190,24 @@
                 <button class="online-tab" id="tabJoin" onclick="switchOnlineTab('join')">Join Desk</button>
             </div>
 
-            <!-- HOST panel -->
+            <!-- HOST panel: Contains the Twitter share and Copy link buttons -->
             <div id="hostPanel" class="online-panel">
                 <div class="room-code-display">
                     <div class="room-code-label">Your Room Code</div>
                     <div class="room-code" id="displayRoomCode">- - - - -</div>
-                    <div class="room-code-hint">Share this code with your friend so they can join</div>
                 </div>
                 <div class="host-row">
                     <div id="qrContainer" class="qr-box">
-                        <div class="qr-placeholder">Generating QR code...</div>
+                        <div class="qr-placeholder">Generating QR...</div>
                     </div>
                     <div class="host-actions">
                         <button class="btn-ink-action" onclick="menuCopyLink()">
-                            📋 Copy Room Invite Link
+                            📋 Copy Invite Link
                         </button>
                         <button class="btn-ink-action" onclick="menuTweet()">
-                            ⚡ Challenge on X / Twitter
+                            ⚡ Share on Twitter / X
                         </button>
-                        <div id="connectionBadge" class="conn-badge waiting">Waiting for opponent to connect...</div>
+                        <div id="connectionBadge" class="conn-badge waiting">Waiting for opponent...</div>
                     </div>
                 </div>
             </div>
@@ -216,12 +215,12 @@
             <!-- JOIN panel -->
             <div id="joinPanel" class="online-panel hidden">
                 <div class="join-form">
-                    <label class="join-label" for="joinCodeInput">Enter Friend's 5-Letter Room Code</label>
+                    <label class="join-label" for="joinCodeInput">Enter Room Code</label>
                     <input id="joinCodeInput" class="join-input" type="text"
                            maxlength="5" placeholder="e.g. PEN82"
                            autocomplete="off" autocorrect="off" spellcheck="false"
                            oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
-                    <button class="btn-ink-action" style="margin-top:10px;" onclick="menuJoinRoom()">
+                    <button class="btn-ink-action" style="margin-top:8px;" onclick="menuJoinRoom()">
                         Connect to Desk
                     </button>
                     <div id="joinStatus" class="conn-badge waiting hidden">Connecting...</div>
@@ -233,8 +232,8 @@
         <div class="menu-section">
             <div class="menu-label">Control Method</div>
             <div class="ink-pill-row" id="ctrlRow">
-                <button class="ink-pill active" id="btnCtrlMouse" data-group="ctrl" data-val="0" onclick="selectInkPill(this)">🖱️ PC Mouse (Aim & Charge)</button>
-                <button class="ink-pill" id="btnCtrlTouch" data-group="ctrl" data-val="1" onclick="selectInkPill(this)">📱 Mobile (Swipe to Flick)</button>
+                <button class="ink-pill active" id="btnCtrlMouse" data-group="ctrl" data-val="0" onclick="selectInkPill(this)">🖱️ PC Mouse</button>
+                <button class="ink-pill" id="btnCtrlTouch" data-group="ctrl" data-val="1" onclick="selectInkPill(this)">📱 Mobile Swipe</button>
             </div>
         </div>
 
@@ -242,21 +241,19 @@
 
         <!-- START / RESUME BUTTON ROW -->
         <div class="menu-start-row">
-            <div id="wasmStatus" class="wasm-status">Loading Box2D v3 physics engine...</div>
-            <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; width:100%;">
-                <button class="start-btn" id="startBtn" onclick="launchGame(false)" disabled>
-                    Enter Classroom  ▶
-                </button>
-                <button class="secondary-btn hidden" id="resetMatchBtn" onclick="launchGame(true)">
-                    Start Fresh Match 🔄
-                </button>
+            <div id="wasmStatus" class="wasm-status">Loading physics engine...</div>
+            <button class="start-btn" id="startBtn" onclick="launchGame(false)" disabled>
+                Enter Classroom  ▶
+            </button>
+            <div id="resetMatchBtn" class="reset-link hidden" onclick="launchGame(true)">
+                Start Fresh Match 🔄
             </div>
         </div>
 
         <!-- Footer note -->
         <div class="menu-footer">
             100% Free P2P &nbsp;·&nbsp; Box2D v3.2.0 &nbsp;·&nbsp;
-            <a href="https://github.com/TherealE2O/birogame" target="_blank" rel="noopener">GitHub Project</a>
+            <a href="https://github.com/TherealE2O/birogame" target="_blank" rel="noopener">GitHub</a>
         </div>
 
     </div>
@@ -264,6 +261,7 @@
 
 <!-- ============================================================ -->
 <!--  GAME CANVAS AREA                                            -->
+<!--  UNCLUTTERED: Only ONE Menu Button!                          -->
 <!-- ============================================================ -->
 <div id="gameArea" class="game-area hidden">
     <header class="classroom-header">
@@ -271,12 +269,8 @@
             <h1 class="brand-title">BIRO CLASH</h1>
             <span class="brand-subtitle">School Desk Physics</span>
         </div>
-        <div class="header-badges">
-            <button class="badge badge-menu" onclick="window.toggleNotebookMenu()">⏸ MENU</button>
-            <span class="badge badge-box2d">Box2D v3.2.0</span>
-            <button class="badge badge-action" onclick="window.copyRoomLink()">📋 Copy Room</button>
-            <button class="badge badge-action" onclick="window.tweetChallenge()">⚡ Tweet Link</button>
-        </div>
+        <!-- ONLY ONE MENU BUTTON -->
+        <button class="header-menu-btn" onclick="window.toggleNotebookMenu()">⏸ MENU</button>
     </header>
 
     <main class="game-container">
@@ -287,7 +281,7 @@
                 <div class="loading-paper">
                     <div class="loading-pen-icon">&#128394;</div>
                     <div class="loading-title">OPENING SCHOOL DESK...</div>
-                    <div class="loading-subtitle">Compiling Box2D v3 &amp; Raylib WebAssembly</div>
+                    <div class="loading-subtitle">Compiling Box2D v3 WebAssembly</div>
                     <div class="progress-track">
                         <div id="progressBar" class="progress-bar"></div>
                     </div>
@@ -297,19 +291,8 @@
         </div>
     </main>
 
-    <footer class="action-tray">
-        <div class="tray-shortcuts">
-            <span>Controls:</span>
-            <span><span class="kbd">CLICK / TOUCH</span> Aim & Flick</span>
-            <span><span class="kbd">ESC / M</span> Pause Menu</span>
-            <span><span class="kbd">R</span> Reset Round</span>
-        </div>
-        <div class="tray-buttons">
-            <button class="btn-tray" onclick="window.toggleNotebookMenu()">⏸ Menu</button>
-            <button class="btn-tray" onclick="window.copyRoomLink()">📋 Copy Invite</button>
-            <button class="btn-tray" onclick="window.tweetChallenge()">⚡ Tweet on X</button>
-            <button class="btn-tray" onclick="window.toggleGameFullscreen()">⛶ Fullscreen</button>
-        </div>
+    <footer class="classroom-footer">
+        <span class="footer-hint">Touch &amp; swipe or click &amp; hold to flick &nbsp;·&nbsp; Tap [⏸ MENU] for desk setup &amp; lobby</span>
     </footer>
 </div>
 
@@ -393,7 +376,7 @@
 /* ----------------------------------------------------------------
    Menu state
 ---------------------------------------------------------------- */
-var isMobileDevice = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && !/Windows NT|Macintosh|Linux x86_64/i.test(navigator.userAgent);
+var isMobileDevice = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth <= 768);
 
 var menuSel = {
     mode:        0,   // 0=1v1  1=2v2  2=Royale
@@ -430,7 +413,6 @@ function selectVisualCard(card) {
     if (group === 'table') { menuSel.table = val; }
     if (group === 'stage') { menuSel.stage = val; }
 
-    // If game has already launched, apply live changes
     if (menuSel.hasLaunched && window.Module) {
         if (group === 'mode'  && Module._SetGameMode)  Module._SetGameMode(val);
         if (group === 'table' && Module._SetTableType) Module._SetTableType(val);
@@ -477,9 +459,9 @@ function switchOnlineTab(tab) {
 function menuCopyLink() {
     var url = window.menuGetShareUrl ? window.menuGetShareUrl() : window.location.href;
     navigator.clipboard.writeText(url).then(function() {
-        showMenuToast('📋 Desk invite link copied to clipboard!');
+        showMenuToast('📋 Invite link copied to clipboard!');
     }).catch(function() {
-        prompt('Copy this desk invite link:', url);
+        prompt('Copy invite link:', url);
     });
 }
 
@@ -505,7 +487,7 @@ function showMenuToast(msg) {
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(el._t);
-    el._t = setTimeout(function() { el.classList.remove('show'); }, 3500);
+    el._t = setTimeout(function() { el.classList.remove('show'); }, 3000);
 }
 
 /* ----------------------------------------------------------------
@@ -522,7 +504,6 @@ function launchGame(isFreshStart) {
     document.getElementById('mainMenu').classList.add('hidden');
     document.getElementById('gameArea').classList.remove('hidden');
 
-    // Show secondary reset button next time menu is opened
     document.getElementById('resetMatchBtn').classList.remove('hidden');
     document.getElementById('startBtn').textContent = 'Resume Match  ▶';
 
@@ -541,7 +522,7 @@ function launchGame(isFreshStart) {
 }
 
 /* ----------------------------------------------------------------
-   URL room-code auto-join (direct invite link)
+   URL room-code auto-join / auto-host
 ---------------------------------------------------------------- */
 (function() {
     var params = new URLSearchParams(window.location.search);

@@ -1568,8 +1568,8 @@ static void ResetAllBirosForModeAndStage(Biro biros[4], GameMode mode, StageRack
     float piOver2 = 1.5707963f;
 
     if (mode == MODE_1V1) {
-        b2Vec2 p1Pos = { -2.8f, 0.0f };
-        b2Vec2 p2Pos = {  2.8f, 0.0f };
+        b2Vec2 p1Pos = { -2.4f, 0.0f };
+        b2Vec2 p2Pos = {  2.4f, 0.0f };
         float p1Angle = 0.0f;
         float p2Angle = 3.14159265f;
 
@@ -1590,10 +1590,10 @@ static void ResetAllBirosForModeAndStage(Biro biros[4], GameMode mode, StageRack
         biros[3].isEliminated = true;
 
     } else if (mode == MODE_TEAMS_2V2) {
-        b2Vec2 p1Pos = { -3.2f, -1.25f };
-        b2Vec2 p3Pos = { -3.2f,  1.25f };
-        b2Vec2 p2Pos = {  3.2f, -1.25f };
-        b2Vec2 p4Pos = {  3.2f,  1.25f };
+        b2Vec2 p1Pos = { -2.6f, -0.90f };
+        b2Vec2 p3Pos = { -2.6f,  0.90f };
+        b2Vec2 p2Pos = {  2.6f, -0.90f };
+        b2Vec2 p4Pos = {  2.6f,  0.90f };
 
         float p1Angle = 0.0f;
         float p3Angle = 0.0f;
@@ -1618,10 +1618,10 @@ static void ResetAllBirosForModeAndStage(Biro biros[4], GameMode mode, StageRack
         ResetBiro(&biros[3], p4Pos, p4Angle);
 
     } else { // MODE_BATTLE_ROYALE
-        b2Vec2 p1Pos = { -3.2f, -1.25f };
-        b2Vec2 p2Pos = {  3.2f, -1.25f };
-        b2Vec2 p3Pos = { -3.2f,  1.25f };
-        b2Vec2 p4Pos = {  3.2f,  1.25f };
+        b2Vec2 p1Pos = { -2.6f, -0.90f };
+        b2Vec2 p2Pos = {  2.6f, -0.90f };
+        b2Vec2 p3Pos = { -2.6f,  0.90f };
+        b2Vec2 p4Pos = {  2.6f,  0.90f };
 
         float p1Angle =  0.35f;
         float p2Angle =  2.79f;
@@ -3244,7 +3244,7 @@ EMSCRIPTEN_EXPORT void ResetFullMatch(void) {
 // Main Game Application
 int main(int argc, char** argv) {
     g_game.currentTableType = TABLE_FRONT_BARRIER;
-    g_game.currentGameMode = MODE_TEAMS_2V2;
+    g_game.currentGameMode = MODE_1V1;
     g_game.currentStage = STAGE_VERTICAL;
     g_game.matchType = MATCH_SINGLE_PLAYER_AI;
     g_game.aiDifficulty = AI_DESKMATE;
