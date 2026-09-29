@@ -720,6 +720,179 @@ canvas {
 }
 
 /* ============================================================
+   CLASSROOM NOTE PASSING (CHAT UI)
+   ============================================================ */
+.desk-note-tab {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 15;
+    background: var(--paper-ivory);
+    color: var(--ink-black);
+    border: 1.5px solid var(--ink-black);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-family: 'Patrick Hand', cursive;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    transition: all 0.15s ease;
+    user-select: none;
+}
+.desk-note-tab:hover {
+    background: var(--ink-black);
+    color: var(--paper-ivory);
+    transform: translateY(-1px);
+}
+
+.desk-note-notification {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 25;
+    background: #FFFDF0;
+    border: 1.5px dashed var(--ink-black);
+    border-radius: 6px;
+    padding: 6px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+    max-width: 90%;
+    animation: popNoteIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+@keyframes popNoteIn {
+    0% { opacity: 0; transform: translate(-50%, -15px) scale(0.9); }
+    100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+.desk-note-notification.anim-fadeout {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.95);
+    transition: all 0.35s ease;
+}
+.desk-note-pin { font-size: 14px; }
+.desk-note-body { display: flex; align-items: baseline; gap: 6px; }
+.desk-note-sender {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-muted);
+}
+.desk-note-text {
+    font-family: 'Kalam', cursive;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink-black);
+    letter-spacing: 0.3px;
+}
+
+.desk-note-drawer {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    z-index: 30;
+    background: var(--paper-ivory);
+    border: 2px solid var(--ink-black);
+    border-radius: 6px;
+    padding: 10px 12px;
+    width: 290px;
+    max-width: calc(100% - 16px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: slideNoteDrawer 0.2s ease-out;
+}
+@keyframes slideNoteDrawer {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+.desk-note-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Patrick Hand', cursive;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-black);
+    border-bottom: 1px dashed var(--ink-muted);
+    padding-bottom: 4px;
+}
+.desk-note-close {
+    background: none;
+    border: none;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--ink-black);
+    padding: 0 4px;
+    line-height: 1;
+}
+.desk-note-close:hover {
+    color: #CC0000;
+}
+.desk-quick-notes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.quick-note-btn {
+    background: var(--card-white);
+    border: 1px solid var(--ink-black);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-family: 'Patrick Hand', cursive;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--ink-black);
+    transition: all 0.12s;
+    user-select: none;
+}
+.quick-note-btn:hover {
+    background: var(--ink-black);
+    color: var(--paper-ivory);
+}
+.desk-note-form {
+    display: flex;
+    gap: 4px;
+    margin-top: 2px;
+}
+.desk-note-input {
+    flex: 1;
+    background: var(--card-white);
+    border: 1.5px solid var(--ink-black);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 12px;
+    color: var(--ink-black);
+    outline: none;
+}
+.desk-note-input:focus {
+    border-color: #000000;
+    box-shadow: 0 0 0 1px #000000;
+}
+.desk-note-send-btn {
+    background: var(--ink-black);
+    color: var(--paper-ivory);
+    border: 1.5px solid var(--ink-black);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-family: 'Patrick Hand', cursive;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.desk-note-send-btn:hover {
+    background: #333333;
+}
+
+/* ============================================================
    MOBILE RESPONSIVENESS (< 680px)
    ============================================================ */
 @media (max-width: 680px) {
@@ -871,5 +1044,24 @@ canvas {
     }
     .footer-hint {
         font-size: 10px;
+    }
+    .desk-note-tab {
+        top: 6px;
+        left: 6px;
+        font-size: 11px;
+        padding: 3px 7px;
+    }
+    .desk-note-drawer {
+        width: calc(100% - 16px);
+        bottom: 6px;
+        left: 8px;
+        padding: 8px;
+    }
+    .desk-note-notification {
+        top: 6px;
+        padding: 4px 10px;
+    }
+    .desk-note-text {
+        font-size: 13px;
     }
 }

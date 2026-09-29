@@ -285,6 +285,42 @@
         <div class="canvas-frame">
             <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 
+            <!-- Classroom Note Passing (In-Game Chat) -->
+            <button id="deskNoteTab" class="desk-note-tab" onclick="toggleDeskNoteDrawer()" title="Pass a classroom note">
+                📝 Pass Note
+            </button>
+
+            <!-- Incoming Note Popup Notification -->
+            <div id="deskNoteNotification" class="desk-note-notification hidden">
+                <div class="desk-note-pin">📌</div>
+                <div class="desk-note-body">
+                    <span class="desk-note-sender" id="deskNoteSender">Classmate:</span>
+                    <span class="desk-note-text" id="deskNoteText">"Nice shot!"</span>
+                </div>
+            </div>
+
+            <!-- Folded Notebook Note Drawer -->
+            <div id="deskNoteDrawer" class="desk-note-drawer hidden">
+                <div class="desk-note-header">
+                    <span>📝 PASS A DESK NOTE</span>
+                    <button class="desk-note-close" onclick="toggleDeskNoteDrawer()">✕</button>
+                </div>
+                <div class="desk-quick-notes">
+                    <button class="quick-note-btn" onclick="sendQuickNote('Nice shot! 🎯')">🎯 Nice shot!</button>
+                    <button class="quick-note-btn" onclick="sendQuickNote('Lucky bounce off the edge! ⚡')">⚡ Lucky bounce!</button>
+                    <button class="quick-note-btn" onclick="sendQuickNote('My desk now! 🔥')">🔥 My desk now!</button>
+                    <button class="quick-note-btn" onclick="sendQuickNote('Calculated with physics! 📐')">📐 Calculated!</button>
+                    <button class="quick-note-btn" onclick="sendQuickNote('Shhh, teacher is looking! 🤫')">🤫 Shhh!</button>
+                    <button class="quick-note-btn" onclick="sendQuickNote('Good game! Rematch? 🤝')">🤝 Rematch?</button>
+                </div>
+                <form class="desk-note-form" onsubmit="event.preventDefault(); submitDeskNote();">
+                    <input id="chatNoteInput" type="text" class="desk-note-input"
+                           placeholder="Whisper a note... (Press Enter)"
+                           maxlength="50" autocomplete="off">
+                    <button type="submit" class="desk-note-send-btn">Send ✉️</button>
+                </form>
+            </div>
+
             <div id="loadingOverlay" class="loading-overlay">
                 <div class="loading-paper">
                     <div class="loading-pen-icon">&#128394;</div>

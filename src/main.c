@@ -480,6 +480,9 @@ typedef struct {
     const char* autoScreenshotPath;
     bool autotestMode;
     bool startInMarket;
+    bool isDemoMode;
+    int recordFramesTotal;
+    int recordFramesCurrent;
 
     // ---- Touch / Swipe control vs Desktop PC Mouse control ----
     // false = Desktop PC Mouse (rotating arrow, ruler charge, release to strike)
@@ -1636,10 +1639,10 @@ static void ResetAllBirosForModeAndStage(Biro biros[4], GameMode mode, StageRack
         b2Vec2 p3Pos = { -2.6f,  0.90f };
         b2Vec2 p4Pos = {  2.6f,  0.90f };
 
-        float p1Angle =  0.35f;
-        float p2Angle =  2.79f;
-        float p3Angle = -0.35f;
-        float p4Angle = -2.79f;
+        float p1Angle =  0.0f;
+        float p2Angle =  3.14159265f;
+        float p3Angle =  0.0f;
+        float p4Angle =  3.14159265f;
 
         if (stage == STAGE_VERTICAL) {
             p1Angle = -piOver2;
@@ -1954,7 +1957,9 @@ static void UpdateAIBotTurn(float dt) {
     if (g_game.biros[cur].isEliminated) return;
 
     bool isAI = false;
-    if (g_game.matchType == MATCH_SINGLE_PLAYER_AI && cur != 0) {
+    if (g_game.isDemoMode) {
+        isAI = true;
+    } else if (g_game.matchType == MATCH_SINGLE_PLAYER_AI && cur != 0) {
         isAI = true;
     }
 
@@ -2424,7 +2429,7 @@ static void UpdateDrawFrame(void) {
 
     // Run AI Bot if it's the AI's turn!
     if (!g_game.showOnlineModal && !g_game.isPausedMenuOpen) {
-        if (g_game.state == STATE_AIMING && g_game.matchType == MATCH_SINGLE_PLAYER_AI && g_game.activePlayer != 0) {
+        if (g_game.state == STATE_AIMING && (g_game.isDemoMode || (g_game.matchType == MATCH_SINGLE_PLAYER_AI && g_game.activePlayer != 0))) {
             UpdateAIBotTurn(dt);
         }
     }
@@ -3182,6 +3187,17 @@ static void UpdateDrawFrame(void) {
     EndDrawing();
 
     g_game.frameCount++;
+
+    if (g_game.recordFramesTotal > 0 && g_game.recordFramesCurrent < g_game.recordFramesTotal) {
+        char framePath[256];
+        snprintf(framePath, sizeof(framePath), "trailer_frames/frame_%04d.png", g_game.recordFramesCurrent++);
+        TakeScreenshot(framePath);
+        if (g_game.recordFramesCurrent >= g_game.recordFramesTotal) {
+#if !defined(PLATFORM_WEB)
+            exit(0);
+#endif
+        }
+    }
     if (g_game.autoScreenshotPath != NULL) {
         if (strstr(g_game.autoScreenshotPath, "zero_aim") && g_game.frameCount >= 7) {
             TakeScreenshot(g_game.autoScreenshotPath);
@@ -3341,6 +3357,11 @@ int main(int argc, char** argv) {
             customP1Model = atoi(argv[++i]) % NUM_PEN_MODELS;
         } else if (strcmp(argv[i], "--p2-model") == 0 && i + 1 < argc) {
             customP2Model = atoi(argv[++i]) % NUM_PEN_MODELS;
+        } else if (strcmp(argv[i], "--demo") == 0) {
+            g_game.isDemoMode = true;
+        } else if (strcmp(argv[i], "--record-frames") == 0 && i + 1 < argc) {
+            g_game.recordFramesTotal = atoi(argv[++i]);
+            g_game.recordFramesCurrent = 0;
         }
     }
 

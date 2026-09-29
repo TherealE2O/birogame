@@ -302,6 +302,12 @@
             case 'handshake':
                 console.log('[MP] Handshake received', data);
                 break;
+            case 'chat':
+                if (data.text) {
+                    const senderName = data.sender === 'P1' ? 'Opponent (P1)' : (data.sender === 'P2' ? 'Opponent (P2)' : 'Classmate');
+                    displayDeskNote(senderName, data.text, false);
+                }
+                break;
         }
     }
 
@@ -443,5 +449,112 @@
             if (document.exitFullscreen) document.exitFullscreen();
         }
     };
+
+    /* ------------------------------------------------------------------
+       Classroom Note Passing (Chatting Functionality)
+    ------------------------------------------------------------------ */
+    window.toggleDeskNoteDrawer = function() {
+        const drawer = document.getElementById('deskNoteDrawer');
+        if (!drawer) return;
+        const isHidden = drawer.classList.contains('hidden');
+        drawer.classList.toggle('hidden', !isHidden);
+        if (isHidden) {
+            const inp = document.getElementById('chatNoteInput');
+            if (inp) {
+                setTimeout(() => inp.focus(), 60);
+            }
+        }
+    };
+
+    window.sendQuickNote = function(text) {
+        window.sendDeskNote(text);
+        const drawer = document.getElementById('deskNoteDrawer');
+        if (drawer) drawer.classList.add('hidden');
+    };
+
+    window.submitDeskNote = function() {
+        const inp = document.getElementById('chatNoteInput');
+        if (!inp) return;
+        const val = inp.value ? inp.value.trim() : '';
+        if (val.length > 0) {
+            window.sendDeskNote(val);
+            inp.value = '';
+        }
+        const drawer = document.getElementById('deskNoteDrawer');
+        if (drawer) drawer.classList.add('hidden');
+    };
+
+    window.sendDeskNote = function(text) {
+        if (!text) return;
+        const sender = net.isHost ? 'You (P1)' : (net.isConnected ? 'You (P2)' : 'You');
+        displayDeskNote(sender, text, true);
+
+        if (net.conn && net.conn.open) {
+            sendPacket({
+                type: 'chat',
+                sender: net.isHost ? 'P1' : 'P2',
+                text: text,
+                timestamp: Date.now()
+            });
+        } else {
+            // Solo vs AI Bot banter
+            triggerAIBanter(text);
+        }
+    };
+
+    function triggerAIBanter(userText) {
+        const aiReplies = [
+            "I calculated this angle using trigonometry! 📐",
+            "Watch the desk edge! Don't blame the biro! 🖊️",
+            "Lucky bounce off the ruler! 📏",
+            "My turn to flick! Don't sneeze! 😤",
+            "Shhh! The teacher is looking this way! 🤫",
+            "Biro duel of the century! 🔥",
+            "Try dodging this bank shot! 🎯",
+            "Gravity never sleeps! ⚡"
+        ];
+        setTimeout(() => {
+            const reply = aiReplies[Math.floor(Math.random() * aiReplies.length)];
+            displayDeskNote('Classmate AI 🤖', reply, false);
+        }, 1300);
+    }
+
+    function displayDeskNote(sender, text, isSelf) {
+        const el = document.getElementById('deskNoteNotification');
+        const senderEl = document.getElementById('deskNoteSender');
+        const textEl = document.getElementById('deskNoteText');
+        if (!el || !senderEl || !textEl) return;
+
+        senderEl.textContent = sender + ':';
+        textEl.textContent = `"${text}"`;
+        el.classList.remove('hidden');
+        el.classList.remove('anim-fadeout');
+
+        clearTimeout(el._timer);
+        el._timer = setTimeout(() => {
+            el.classList.add('anim-fadeout');
+            setTimeout(() => el.classList.add('hidden'), 350);
+        }, 4200);
+    }
+
+    // Keyboard shortcut: Press Enter to open or focus Note Passing drawer
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const drawer = document.getElementById('deskNoteDrawer');
+            const inp = document.getElementById('chatNoteInput');
+            if (drawer && drawer.classList.contains('hidden')) {
+                const gameArea = document.getElementById('gameArea');
+                if (gameArea && !gameArea.classList.contains('hidden')) {
+                    e.preventDefault();
+                    window.toggleDeskNoteDrawer();
+                }
+            }
+        } else if (e.key === 'Escape') {
+            const drawer = document.getElementById('deskNoteDrawer');
+            if (drawer && !drawer.classList.contains('hidden')) {
+                drawer.classList.add('hidden');
+            }
+        }
+    });
 
 })();
