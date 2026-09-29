@@ -188,6 +188,9 @@
         net.peer.on('open', () => {
             console.log(`[MP] Host peer open: ${net.fullPeerId}`);
             updateRoomCodeUI(net.roomCode);
+            if (window.trackGameEvent) {
+                window.trackGameEvent('multiplayer_host_created', { room_code: net.roomCode });
+            }
             if (net.wasmReady) {
                 c_setRoomCode(net.roomCode);
                 if (Module._SetOnlineRole) Module._SetOnlineRole(1);
@@ -252,6 +255,12 @@
         conn.on('open', () => {
             net.isConnected = true;
             console.log('[MP] DataChannel open!');
+            if (window.trackGameEvent) {
+                window.trackGameEvent('multiplayer_connected', {
+                    role: net.isHost ? 'host' : 'guest',
+                    room_code: net.roomCode
+                });
+            }
             if (net.wasmReady && Module._SetOnlineConnectionStatus) {
                 Module._SetOnlineConnectionStatus(1);
             }
@@ -488,6 +497,12 @@
         if (!text) return;
         const sender = net.isHost ? 'You (P1)' : (net.isConnected ? 'You (P2)' : 'You');
         displayDeskNote(sender, text, true);
+
+        if (window.trackGameEvent) {
+            window.trackGameEvent('desk_note_passed', {
+                is_multiplayer: !!(net.conn && net.conn.open)
+            });
+        }
 
         if (net.conn && net.conn.open) {
             sendPacket({

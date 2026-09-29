@@ -1,6 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-FC4CXH2W37"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-FC4CXH2W37');
+
+      window.trackGameEvent = function(eventName, params) {
+          try {
+              if (typeof gtag === 'function') {
+                  gtag('event', eventName, params || {});
+              }
+          } catch (e) {
+              console.warn('[Analytics]', e);
+          }
+      };
+    </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BIRO CLASH - School Desk Physics | Box2D v3</title>
@@ -514,6 +534,7 @@ function switchOnlineTab(tab) {
 
 function menuCopyLink() {
     var url = window.menuGetShareUrl ? window.menuGetShareUrl() : window.location.href;
+    if (window.trackGameEvent) window.trackGameEvent('invite_link_copied');
     navigator.clipboard.writeText(url).then(function() {
         showMenuToast('📋 Invite link copied to clipboard!');
     }).catch(function() {
@@ -522,6 +543,7 @@ function menuCopyLink() {
 }
 
 function menuTweet() {
+    if (window.trackGameEvent) window.trackGameEvent('twitter_share_clicked');
     if (typeof window.tweetChallenge === 'function') {
         window.tweetChallenge();
     }
@@ -531,6 +553,7 @@ function menuJoinRoom() {
     var code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
     if (code.length < 2) { showMenuToast('Enter a valid room code'); return; }
     menuSel.joinCode = code;
+    if (window.trackGameEvent) window.trackGameEvent('menu_join_room_attempt', { room_code: code });
     document.getElementById('joinStatus').classList.remove('hidden');
     document.getElementById('joinStatus').textContent = 'Connecting to desk ' + code + '...';
     if (typeof window.menuConnectAsGuest === 'function') {
@@ -554,6 +577,17 @@ function launchGame(isFreshStart) {
         var code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
         if (code.length < 2) { showMenuToast('Enter a valid room code first'); return; }
         menuSel.joinCode = code;
+    }
+
+    if (window.trackGameEvent) {
+        var modeNames = ['vs_ai', 'target_practice', 'multiplayer_p2p', 'battle_royale'];
+        window.trackGameEvent(isFreshStart ? 'game_start' : 'game_resume', {
+            match_mode: modeNames[menuSel.matchType] || 'vs_ai',
+            desk_type: menuSel.deskType,
+            pen_skin: menuSel.skin,
+            ai_difficulty: menuSel.difficulty,
+            stage_axis: menuSel.stageAxis
+        });
     }
 
     menuSel.hasLaunched = true;
