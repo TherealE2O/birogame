@@ -2039,7 +2039,7 @@ static void DrawOnlineModal(Vector2 mouse) {
 
     DrawSchoolText("SECRET REVENUE-FREE ROOM CODE:", codeBox.x + 16, codeBox.y + 8, 12, (Color){ 85, 95, 110, 255 });
     const char* roomDisplay = (strlen(g_game.onlineRoomCode) > 0) ? g_game.onlineRoomCode : "PEN1";
-    DrawSchoolTextTitle(TextFormat("CODE:   %s", roomDisplay), codeBox.x + 16, codeBox.y + 26, 28, (Color){ 22, 55, 165, 255 });
+    DrawText(TextFormat("CODE:   %s", roomDisplay), codeBox.x + 16, codeBox.y + 28, 24, (Color){ 22, 55, 165, 255 });
 
     Rectangle statusBox = { modal.x + 50, modal.y + 160, modal.width - 100, 48 };
     if (g_game.isOnlineConnected) {

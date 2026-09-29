@@ -44,7 +44,8 @@
        Utilities
     ------------------------------------------------------------------ */
     function generateRoomCode() {
-        const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+        // Exclude ambiguous characters: 0/O, 1/I, and confusing cursive letters like G and Z
+        const chars = '23456789ABCDEFHJKLMNPQRSTUVWXY';
         let code = '';
         for (let i = 0; i < 5; i++) {
             code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -314,6 +315,8 @@
     function updateRoomCodeUI(code) {
         const el = document.getElementById('displayRoomCode');
         if (el) el.textContent = code;
+        const linkEl = document.getElementById('displayRoomLink');
+        if (linkEl) linkEl.textContent = getShareableRoomUrl();
         renderQRCode(getShareableRoomUrl());
     }
 
