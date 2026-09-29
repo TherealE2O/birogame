@@ -517,6 +517,20 @@ html, body {
     color: var(--ink-black);
 }
 
+.menu-bug-link {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-muted);
+    text-decoration: underline;
+    transition: color 0.15s ease;
+    margin-top: 2px;
+    display: inline-block;
+}
+.menu-bug-link:hover {
+    color: var(--ink-black);
+}
+
 .menu-footer {
     text-align: center;
     font-size: 11px;
@@ -670,6 +684,15 @@ canvas {
 .footer-hint {
     font-size: 12px;
     color: #7E8E7E;
+}
+.footer-bug-link {
+    color: #A4BCA4;
+    text-decoration: underline;
+    font-weight: 600;
+    transition: color 0.15s;
+}
+.footer-bug-link:hover {
+    color: #FFFFFF;
 }
 
 /* Toast */

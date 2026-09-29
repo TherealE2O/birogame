@@ -1283,7 +1283,7 @@ static void DrawPauseMenuModal(Vector2 mouse) {
     // Dim background overlay
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){ 10, 15, 12, 210 });
 
-    Rectangle modal = { 390, 125, 500, 470 };
+    Rectangle modal = { 390, 115, 500, 495 };
 
     // Drop shadow
     DrawRectangleRounded((Rectangle){ modal.x + 6, modal.y + 6, modal.width, modal.height }, 0.05f, 4, (Color){ 0, 0, 0, 140 });
@@ -1340,8 +1340,16 @@ static void DrawPauseMenuModal(Vector2 mouse) {
         DrawSchoolTextTitle(btnTitles[i], btn.x + btn.width * 0.5f - tw * 0.5f, btn.y + (btn.height - fsz) * 0.5f - 2, fsz, fg);
     }
 
+    Rectangle bugBtn = { modal.x + 40, modal.y + 428, modal.width - 80, 32 };
+    bool isHoverBug = CheckCollisionPointRec(mouse, bugBtn);
+    DrawRectangleRounded(bugBtn, 0.2f, 4, isHoverBug ? (Color){ 20, 20, 20, 255 } : (Color){ 245, 240, 230, 255 });
+    DrawRectangleRoundedLines(bugBtn, 0.2f, 4, (Color){ 20, 20, 20, 255 });
+    const char* bugTxt = "REPORT A BUG / ISSUES (GITHUB)";
+    int btw = MeasureText(bugTxt, 11);
+    DrawSchoolTextTitle(bugTxt, bugBtn.x + bugBtn.width * 0.5f - btw * 0.5f, bugBtn.y + 8, 11, isHoverBug ? (Color){ 250, 246, 238, 255 } : (Color){ 20, 20, 20, 255 });
+
     if (g_game.matchType == MATCH_ONLINE_P2P) {
-        DrawSchoolText("* Note: In Online P2P, desks remain synchronized.", modal.x + 50, modal.y + modal.height - 24, 11, (Color){ 100, 100, 100, 255 });
+        DrawSchoolText("* Note: In Online P2P, desks remain synchronized.", modal.x + 50, modal.y + modal.height - 22, 11, (Color){ 100, 100, 100, 255 });
     }
 }
 
@@ -2319,7 +2327,7 @@ static void UpdateDrawFrame(void) {
 
     // Handle clicks inside Classroom Pause Menu Modal
     if (g_game.isPausedMenuOpen) {
-        Rectangle modal = { 390, 125, 500, 470 };
+        Rectangle modal = { 390, 115, 500, 495 };
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             for (int i = 0; i < 5; i++) {
                 Rectangle btn = { modal.x + 40, modal.y + 148 + i * 56, modal.width - 80, 46 };
@@ -2348,6 +2356,14 @@ static void UpdateDrawFrame(void) {
                     }
                     clickHandled = true;
                     break;
+                }
+            }
+            if (!clickHandled) {
+                Rectangle bugBtn = { modal.x + 40, modal.y + 428, modal.width - 80, 32 };
+                if (CheckCollisionPointRec(mouse, bugBtn)) {
+                    if (g_audio.audioReady) PlaySound(g_audio.sndTick);
+                    OpenURL("https://github.com/TherealE2O/birogame/issues/new");
+                    clickHandled = true;
                 }
             }
         }

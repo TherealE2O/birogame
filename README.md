@@ -1,47 +1,35 @@
-# Biro Clash
+# 🖊️ Biro Clash
 
-A 2D physics game based on the pen-flicking game we played on school desks growing up.
+> A 2D physics game inspired by the pen-flicking duels we all played on school desks growing up.
 
-Built in C with **Box2D v3** and **Raylib**, compiled to WebAssembly for the browser. Multiplayer runs peer-to-peer over WebRTC via PeerJS, so it runs completely serverless.
-
-▶ **Play online**: [thereale2o.github.io/birogame](https://thereale2o.github.io/birogame/)
+▶ **Play in your browser right now:** [thereale2o.github.io/birogame](https://thereale2o.github.io/birogame/)
 
 ---
 
-## How to Play
+## ⚠️ A Note About This Project
 
-Take turns flicking your biro across the desk. The goal is simple: knock the other player's pen off the table without flying off yourself.
-
-- **Desktop (Mouse)**: Hover over your pen to pick a contact point. Hold left-click to set the angle and charge power, then release to flick.
-- **Mobile (Touch)**: Swipe through the pen. The speed of your swipe determines the power, and where your swipe cuts through the pen dictates the angle and spin.
-- **Game Modes**:
-  - Solo vs AI bot
-  - Local pass & play (same keyboard/mouse)
-  - Online peer-to-peer (share the room link with a friend)
+- **Not an open-source project:** This repository is a personal project, not an open-source library or collaborative software project.
+- **Totally built with AI:** This entire game was built completely using AI.
+- **Found bugs? Let me know:** If you play the game, enjoy it, and encounter any bugs, glitches, or quirks, please feel free to [open an issue on GitHub](https://github.com/TherealE2O/birogame/issues) and I will fix it! You can also click the **Report Bug** link directly inside the game menu.
+- **Future plans:** I might rewrite the whole thing and recreate all the art and graphics with my own hands later down the line.
 
 ---
 
-## Running Locally
+## 🎮 What is Biro Clash?
 
-### Desktop (Windows)
-Requires `zig` or any C compiler in your PATH:
-```bash
-python build.py --run
-```
+Remember balancing your ballpoint pen on the classroom desk during lessons, taking turns flicking it to knock your classmate's pen off the edge? 
 
-### Web (WebAssembly)
-Requires Emscripten (`emsdk`):
-```bash
-python build_web.py
-python -m http.server --directory web_dist 8000
-```
-Then open `http://localhost:8000` in your browser.
+That is what Biro Clash brings to life!
+
+- **The Goal:** Take turns flicking your biro across the school desk. Knock the other pen off the table without falling off the edge yourself.
+- **Game Modes:**
+  - 🤖 **Solo vs AI Bot:** Practice your flicking angles and trick shots against an AI classmate.
+  - 👥 **Local 2-Player:** Share the screen and take turns flicking.
+  - 🌐 **Free Online Multiplayer:** Create a desk, copy the direct invite link or 5-letter room code, and duel a friend on their phone or computer in real-time (100% peer-to-peer with zero lag and no account required).
+  - 🔄 **Arena & Orientation Presets:** Choose between open desks, pencil groove barriers, or dual bounce rails, and test your skills from vertical, horizontal, or gauntlet starting angles.
 
 ---
 
-## Tech Stack
-- **Engine**: C99
-- **Physics**: [Box2D v3](https://github.com/erincatto/box2d)
-- **Graphics/Audio**: [Raylib 6.0](https://www.raylib.com/)
-- **Web Build**: Emscripten (WASM)
-- **Networking**: PeerJS (WebRTC DataChannels)
+## 🐛 Bug Reports & Feedback
+
+If you find anything broken or have an idea to make the game better, please [open an issue here](https://github.com/TherealE2O/birogame/issues/new). Thank you for playing!
